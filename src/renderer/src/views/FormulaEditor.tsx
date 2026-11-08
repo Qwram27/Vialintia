@@ -1,0 +1,1002 @@
+import { useEffect, useMemo, useRef, useState } from 'react'
+import type { AmountUnit, Formula, FormulaRow, FormulaStatus, Material, ProductType, Settings, TestNote, TestPhase, TestStage } from '@shared/types'
+import { NOTE_LABELS, NOTE_ORDER, PRODUCT_PRESETS } from '@shared/defaults'
+import { currentVersion, useMaterialMap, useStore, withRows } from '@/store/store'
+import { confirmDialog, navigate, toast } from '@/store/ui'
+import { computeFormula, fmt, fmtSmart, inkOn, type FormulaCalc } from '@/lib/calc'
+import { formulaToCsv, formulaToPdfHtml } from '@/lib/exports'
+import { uid } from '@/lib/id'
+import { NumberInput } from '@/components/NumberInput'
+import { MaterialPicker } from '@/components/MaterialPicker'
+import { IfraBadge, statusColor } from '@/components/Ifra'
+import { EvolutionChart, FamilyDonut, StructureChart } from '@/components/Charts'
+import { Seg } from '@/components/Seg'
+import { catalogNo, seasonCode, shortDate } from '@/lib/archive'
+import { Stars } from '@/components/Overlays'
+import {
+  IconAlert, IconCheck, IconCompare, IconCopy, IconDownload, IconFile, IconGrip, IconPlus,
+  IconRedo, IconSort, IconTrash, IconUndo, IconX
+} from '@/components/Icons'
+
+const STATUS_LABEL: Record<FormulaStatus, string> = { draft: 'Draft', testing: 'Testing', final: 'Final' }
+const UNIT_LABEL: Record<AmountUnit, string> = { g: 'g', drops: 'drops', parts: 'parts' }
+
+export function FormulaEditor({ id }: { id: string }) {
+  const formula = useStore((s) => s.formulas.find((f) => f.id === id))
+  const settings = useStore((s) => s.settings)
+  const history = useStore((s) => s.history[id])
+  const updateFormula = useStore((s) => s.updateFormula)
+  const undo = useStore((s) => s.undo)
+  const redo = useStore((s) => s.redo)
+  const materials = useMaterialMap()
+  const [tab, setTab] = useState<'composition' | 'notes' | 'details'>('composition')
+
+  const version = formula ? currentVersion(formula) : null
+  const calc = useMemo(
+    () => (formula && version ? computeFormula(formula, version.rows, materials, settings) : null),
+    [formula, version, materials, settings]
+  )
+
+  // Undo / redo shortcuts (only when not typing in a field).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const el = document.activeElement as HTMLElement | null
+      const typing = el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT')
+      if (typing || !(e.ctrlKey || e.metaKey)) return
+      const k = e.key.toLowerCase()
+      if (k === 'z' && !e.shiftKey) {
+        undo(id)
+        e.preventDefault()
+      } else if (k === 'y' || (k === 'z' && e.shiftKey)) {
+        redo(id)
+        e.preventDefault()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [id, undo, redo])
+
+  if (!formula || !version || !calc) {
+    return (
+      <div className="page">
+        <div className="card empty">
+          <h3>Formula not found</h3>
+          <button className="btn mt" onClick={() => navigate('/')}>
+            Back to formulas
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  const update = (fn: (f: Formula) => Formula, history = true) => updateFormula(id, fn, { history })
+  const setRows = (rows: FormulaRow[]) => update((f) => withRows(f, rows))
+
+  return (
+    <div className="page page-wide" style={{ maxWidth: 1700 }}>
+      <Header formula={formula} update={update} calc={calc} versionLabel={version.label} canUndo={!!history?.past.length} canRedo={!!history?.future.length} onUndo={() => undo(id)} onRedo={() => redo(id)} settings={settings} />
+      <Versions formula={formula} update={update} />
+
+      <div className="editor">
+        <div className="card card-pad" style={{ minWidth: 0 }}>
+          <div className="tabs">
+            <Seg
+              size="lg"
+              value={tab}
+              onChange={setTab}
+              options={[
+                { value: 'composition', label: <>Composition<span className="count">{String(version.rows.length).padStart(2, '0')}</span></> },
+                { value: 'notes', label: <>Test notes<span className="count">{String(formula.notes.length).padStart(2, '0')}</span></> },
+                { value: 'details', label: 'Details' }
+              ]}
+            />
+          </div>
+          {tab === 'composition' && (
+            <Composition formula={formula} rows={version.rows} calc={calc} setRows={setRows} update={update} settings={settings} />
+          )}
+          {tab === 'notes' && <Notes formula={formula} update={update} />}
+          {tab === 'details' && <Details formula={formula} update={update} />}
+        </div>
+
+        <Sidebar formula={formula} calc={calc} update={update} settings={settings} />
+      </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------- header
+function Header({
+  formula, update, calc, versionLabel, canUndo, canRedo, onUndo, onRedo, settings
+}: {
+  formula: Formula
+  update: (fn: (f: Formula) => Formula, history?: boolean) => void
+  calc: FormulaCalc
+  versionLabel: string
+  canUndo: boolean
+  canRedo: boolean
+  onUndo: () => void
+  onRedo: () => void
+  settings: Settings
+}) {
+  const [name, setName] = useState(formula.name)
+  const [tagText, setTagText] = useState('')
+  const duplicateFormula = useStore((s) => s.duplicateFormula)
+  const deleteFormula = useStore((s) => s.deleteFormula)
+  const all = useStore((s) => s.formulas)
+  useEffect(() => setName(formula.name), [formula.name])
+
+  const safeName = formula.name.replace(/[\\/:*?"<>|]+/g, '').trim() || 'formula'
+  const fileBase = `${safeName} - ${versionLabel}`
+
+  const addTag = () => {
+    const t = tagText.trim()
+    if (t && !formula.tags.includes(t)) update((f) => ({ ...f, tags: [...f.tags, t] }))
+    setTagText('')
+  }
+
+  return (
+    <div className="editor-head">
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div className="page-kicker">
+          N°{catalogNo(formula, all)} · {seasonCode(formula.createdAt)} · {versionLabel} · {shortDate(formula.createdAt)}
+        </div>
+        <input
+          className="title-input"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onBlur={() => name.trim() && name !== formula.name && update((f) => ({ ...f, name: name.trim() }))}
+          onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
+        />
+        <div className="head-meta">
+          <Seg
+            value={formula.status}
+            onChange={(v) => update((f) => ({ ...f, status: v }))}
+            options={(['draft', 'testing', 'final'] as const).map((s) => ({ value: s, label: STATUS_LABEL[s] }))}
+          />
+          {formula.tags.map((t) => (
+            <span key={t} className="tag">
+              {t}
+              <button onClick={() => update((f) => ({ ...f, tags: f.tags.filter((x) => x !== t) }))} aria-label={`Remove ${t}`}>
+                ×
+              </button>
+            </span>
+          ))}
+          <input
+            className="input input-sm"
+            style={{ width: 120 }}
+            placeholder="+ tag"
+            value={tagText}
+            onChange={(e) => setTagText(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && addTag()}
+            onBlur={addTag}
+          />
+        </div>
+      </div>
+      <div className="btn-group">
+        <button className="btn btn-ghost btn-icon" title="Undo (Ctrl+Z)" disabled={!canUndo} onClick={onUndo}>
+          <IconUndo />
+        </button>
+        <button className="btn btn-ghost btn-icon" title="Redo (Ctrl+Y)" disabled={!canRedo} onClick={onRedo}>
+          <IconRedo />
+        </button>
+        <button className="btn" title="Compare versions" onClick={() => navigate(`/compare?a=${formula.id}`)}>
+          <IconCompare /> Compare
+        </button>
+        <button
+          className="btn"
+          title="Export CSV"
+          onClick={async () => {
+            const p = await window.vialintia.exportText(formulaToCsv(formula, calc, settings), `${fileBase}.csv`, 'csv')
+            if (p) toast('CSV exported')
+          }}
+        >
+          <IconDownload /> CSV
+        </button>
+        <button
+          className="btn"
+          title="Export PDF formula sheet"
+          onClick={async () => {
+            const p = await window.vialintia.printPdf(formulaToPdfHtml(formula, versionLabel, calc, settings, catalogNo(formula, all)), `${fileBase}.pdf`)
+            if (p) toast('PDF saved')
+          }}
+        >
+          <IconFile /> PDF
+        </button>
+        <button
+          className="btn btn-ghost btn-icon"
+          title="Duplicate formula"
+          onClick={() => {
+            const c = duplicateFormula(formula.id)
+            if (c) {
+              navigate(`/formula/${c.id}`)
+              toast('Formula duplicated')
+            }
+          }}
+        >
+          <IconCopy />
+        </button>
+        <button
+          className="btn btn-ghost btn-icon btn-danger"
+          title="Delete formula"
+          onClick={async () => {
+            if (await confirmDialog('Delete formula?', `“${formula.name}” and all its versions and notes will be removed.`)) {
+              deleteFormula(formula.id)
+              navigate('/')
+              toast('Formula deleted')
+            }
+          }}
+        >
+          <IconTrash />
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------- versions
+function Versions({ formula, update }: { formula: Formula; update: (fn: (f: Formula) => Formula, history?: boolean) => void }) {
+  const [editing, setEditing] = useState<string | null>(null)
+  const [label, setLabel] = useState('')
+
+  const newVersion = () => {
+    const src = currentVersion(formula)
+    const nums = formula.versions.map((v) => Number(/(\d+)\s*$/.exec(v.label)?.[1] ?? 0))
+    const v = {
+      id: uid(),
+      label: `Mod ${Math.max(formula.versions.length, ...nums) + 1}`,
+      createdAt: new Date().toISOString(),
+      rows: src.rows.map((r) => ({ ...r, id: uid() }))
+    }
+    update((f) => ({ ...f, versions: [...f.versions, v], currentVersionId: v.id }))
+    toast(`${v.label} created from ${src.label}`)
+  }
+
+  const removeVersion = async (vid: string) => {
+    const v = formula.versions.find((x) => x.id === vid)!
+    const n = formula.notes.filter((x) => x.versionId === vid).length
+    if (!(await confirmDialog(`Delete ${v.label}?`, `This version${n ? ` and its ${n} test note${n > 1 ? 's' : ''}` : ''} will be removed.`))) return
+    update((f) => {
+      const versions = f.versions.filter((x) => x.id !== vid)
+      return {
+        ...f,
+        versions,
+        notes: f.notes.filter((x) => x.versionId !== vid),
+        currentVersionId: f.currentVersionId === vid ? versions[versions.length - 1].id : f.currentVersionId
+      }
+    })
+  }
+
+  const commitLabel = () => {
+    if (editing && label.trim()) {
+      const vid = editing
+      update((f) => ({ ...f, versions: f.versions.map((v) => (v.id === vid ? { ...v, label: label.trim() } : v)) }))
+    }
+    setEditing(null)
+  }
+
+  return (
+    <div className="versions">
+      <span className="label" style={{ marginRight: 6 }}>Versions</span>
+      {formula.versions.map((v) =>
+        editing === v.id ? (
+          <input
+            key={v.id}
+            className="input input-sm"
+            style={{ width: 120, borderRadius: 99 }}
+            autoFocus
+            value={label}
+            onChange={(e) => setLabel(e.target.value)}
+            onBlur={commitLabel}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') commitLabel()
+              if (e.key === 'Escape') setEditing(null)
+            }}
+          />
+        ) : (
+          <button
+            key={v.id}
+            className={`vchip${v.id === formula.currentVersionId ? ' on' : ''}`}
+            title={`${new Date(v.createdAt).toLocaleString('en-GB')} — double-click to rename`}
+            onClick={() => update((f) => ({ ...f, currentVersionId: v.id }), false)}
+            onDoubleClick={() => {
+              setEditing(v.id)
+              setLabel(v.label)
+            }}
+          >
+            {v.label}
+            {formula.versions.length > 1 && v.id === formula.currentVersionId && (
+              <span
+                role="button"
+                title="Delete version"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  removeVersion(v.id)
+                }}
+                style={{ opacity: 0.6, display: 'inline-flex' }}
+              >
+                <IconX size={12} />
+              </span>
+            )}
+          </button>
+        )
+      )}
+      <button className="btn btn-ghost btn-sm" onClick={newVersion} title="Save the current composition as a new modification">
+        <IconPlus size={14} /> New version
+      </button>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------- composition table
+function Composition({
+  formula, rows, calc, setRows, update, settings
+}: {
+  formula: Formula
+  rows: FormulaRow[]
+  calc: FormulaCalc
+  setRows: (rows: FormulaRow[]) => void
+  update: (fn: (f: Formula) => Formula, history?: boolean) => void
+  settings: Settings
+}) {
+  const [adding, setAdding] = useState(false)
+  const [focusRow, setFocusRow] = useState<string | null>(null)
+  const [dragId, setDragId] = useState<string | null>(null)
+  const [overId, setOverId] = useState<string | null>(null)
+  const [armed, setArmed] = useState<string | null>(null)
+  const amountRefs = useRef(new Map<string, HTMLInputElement>())
+  const showBatch = calc.batch.concentrateG > 0
+
+  useEffect(() => {
+    if (focusRow) {
+      amountRefs.current.get(focusRow)?.focus()
+      setFocusRow(null)
+    }
+  }, [focusRow, rows])
+
+  const patchRow = (rid: string, patch: Partial<FormulaRow>) => setRows(rows.map((r) => (r.id === rid ? { ...r, ...patch } : r)))
+
+  const addMaterial = (m: Material) => {
+    const row: FormulaRow = { id: uid(), materialId: m.id, amount: 0, dilution: m.defaultDilution ?? 100, solvent: m.solvent ?? (m.defaultDilution < 100 ? 'DPG' : undefined) }
+    setRows([...rows, row])
+    setFocusRow(row.id)
+  }
+
+  const sortByNote = () => {
+    const rank = (r: FormulaRow) => {
+      const m = calc.rows.find((c) => c.row.id === r.id)?.material
+      return m ? NOTE_ORDER.indexOf(m.note) : 3
+    }
+    const grams = new Map(calc.rows.map((c) => [c.row.id, c.neatGrams]))
+    setRows([...rows].sort((a, b) => rank(a) - rank(b) || (grams.get(b.id) ?? 0) - (grams.get(a.id) ?? 0)))
+  }
+
+  const onEnter = (idx: number) => {
+    if (idx < rows.length - 1) setFocusRow(rows[idx + 1].id)
+    else setAdding(true)
+  }
+
+  const drop = (targetId: string) => {
+    if (!dragId || dragId === targetId) return
+    const from = rows.findIndex((r) => r.id === dragId)
+    const to = rows.findIndex((r) => r.id === targetId)
+    const next = [...rows]
+    const [moved] = next.splice(from, 1)
+    next.splice(to > from ? to - 1 : to, 0, moved)
+    setRows(next)
+  }
+
+  return (
+    <>
+      <div className="row mb" style={{ gap: 10 }}>
+        <span className="label">Amounts in</span>
+        <Seg
+          value={formula.unit}
+          onChange={(u) => update((f) => ({ ...f, unit: u }))}
+          options={(['g', 'drops', 'parts'] as const).map((u) => ({ value: u, label: UNIT_LABEL[u] }))}
+        />
+        {formula.unit === 'drops' && <span className="faint small">1 drop = {settings.dropMassG} g</span>}
+        <div className="spacer" />
+        <button className="btn btn-ghost btn-sm" onClick={sortByNote} disabled={rows.length < 2}>
+          <IconSort size={14} /> Sort by note
+        </button>
+      </div>
+
+      <div className="table-wrap">
+        <table className="ftable">
+          <thead>
+            <tr>
+              <th className="l" style={{ width: 30 }}>N°</th>
+              <th className="l">Material</th>
+              <th className="l">Note</th>
+              <th>Amount ({UNIT_LABEL[formula.unit]})</th>
+              <th>Dilution</th>
+              <th title="Share of the concentrate as weighed">Weighed %</th>
+              <th title="Neat material in the finished product">In product %</th>
+              <th>IFRA</th>
+              {showBatch && <th title="Weighed grams for the batch set in the sidebar">Batch g</th>}
+              <th style={{ width: 30 }} />
+            </tr>
+          </thead>
+          <tbody>
+            {calc.rows.map((r, idx) => {
+              const m = r.material
+              return (
+                <tr
+                  key={r.row.id}
+                  draggable={armed === r.row.id}
+                  className={`${dragId === r.row.id ? 'dragging' : ''}${overId === r.row.id && dragId !== r.row.id ? ' drop-above' : ''}`}
+                  onDragStart={(e) => {
+                    setDragId(r.row.id)
+                    e.dataTransfer.effectAllowed = 'move'
+                  }}
+                  onDragOver={(e) => {
+                    if (!dragId) return
+                    e.preventDefault()
+                    setOverId(r.row.id)
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault()
+                    drop(r.row.id)
+                  }}
+                  onDragEnd={() => {
+                    setDragId(null)
+                    setOverId(null)
+                    setArmed(null)
+                  }}
+                >
+                  <td style={{ width: 30 }}>
+                    <span className="rowno">{String(idx + 1).padStart(2, '0')}</span>
+                    <span className="grip" onMouseDown={() => setArmed(r.row.id)} onMouseUp={() => setArmed(null)} title="Drag to reorder">
+                      <IconGrip size={14} />
+                    </span>
+                  </td>
+                  <td className="l">
+                    <MaterialPicker
+                      material={m}
+                      missing={!m}
+                      onPick={(nm) => patchRow(r.row.id, { materialId: nm.id, dilution: nm.defaultDilution ?? 100, solvent: nm.solvent ?? r.row.solvent })}
+                    />
+                  </td>
+                  <td className="l">
+                    {m && (
+                      <span className="note-pill" style={{ background: settings.noteColors[m.note], color: inkOn(settings.noteColors[m.note]) }}>
+                        {NOTE_LABELS[m.note]}
+                      </span>
+                    )}
+                  </td>
+                  <td>
+                    <NumberInput
+                      ref={(el) => {
+                        if (el) amountRefs.current.set(r.row.id, el)
+                        else amountRefs.current.delete(r.row.id)
+                      }}
+                      className="cell-input"
+                      value={r.row.amount}
+                      min={0}
+                      onCommit={(v) => patchRow(r.row.id, { amount: v ?? 0 })}
+                      onEnter={() => onEnter(idx)}
+                      title={formula.unit === 'drops' ? `${fmtSmart(r.grams)} g` : undefined}
+                    />
+                  </td>
+                  <td>
+                    <div className="row" style={{ gap: 2, justifyContent: 'flex-end' }}>
+                      <NumberInput
+                        className="cell-input narrow"
+                        value={r.row.dilution}
+                        min={0.0001}
+                        max={100}
+                        onCommit={(v) => patchRow(r.row.id, { dilution: v ?? 100 })}
+                        title="% of material in what you weigh (100 = neat)"
+                      />
+                      <span className="dim">%</span>
+                      {r.row.dilution < 100 ? (
+                        <select
+                          className="select solv-select"
+                          value={r.row.solvent ?? ''}
+                          onChange={(e) => patchRow(r.row.id, { solvent: e.target.value || undefined })}
+                        >
+                          <option value="">—</option>
+                          {settings.solvents.map((s) => (
+                            <option key={s} value={s}>
+                              {s}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <span className="dim small" style={{ width: 38, textAlign: 'left', paddingLeft: 4 }}>
+                          neat
+                        </span>
+                      )}
+                    </div>
+                  </td>
+                  <td title={`Neat in concentrate: ${fmtSmart(r.neatPct)}%${r.cost ? ` · cost ${settings.currency}${fmt(r.cost, 2)}` : ''}`}>{fmt(r.weighedPct, 2)}</td>
+                  <td>{fmtSmart(r.productPct)}</td>
+                  <td>
+                    <IfraBadge entry={m ? calc.ifra.byMaterial.get(m.id) : undefined} />
+                  </td>
+                  {showBatch && <td className="muted">{fmtSmart(r.batchGrams)}</td>}
+                  <td>
+                    <button className="btn btn-ghost btn-icon row-del btn-danger" title="Remove row" onClick={() => setRows(rows.filter((x) => x.id !== r.row.id))}>
+                      <IconX size={14} />
+                    </button>
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+          {rows.length > 0 && (
+            <tfoot>
+              <tr>
+                <td />
+                <td className="l">Total</td>
+                <td />
+                <td>{fmtSmart(rows.reduce((s, r) => s + (r.amount || 0), 0))}</td>
+                <td className="muted" style={{ fontWeight: 400 }}>
+                  {formula.unit !== 'g' ? `${fmtSmart(calc.totalGrams)} g` : ''}
+                </td>
+                <td>100.00</td>
+                <td>{fmt(formula.concentration, 2)}</td>
+                <td />
+                {showBatch && <td>{fmt(calc.batch.concentrateG, 2)}</td>}
+                <td />
+              </tr>
+            </tfoot>
+          )}
+        </table>
+      </div>
+
+      <div className="add-row">
+        {adding ? (
+          <MaterialPicker
+            autoOpen
+            onPick={(m) => {
+              addMaterial(m)
+              setAdding(false)
+            }}
+            onClose={() => setAdding(false)}
+          />
+        ) : (
+          <button className="btn btn-sm" onClick={() => setAdding(true)}>
+            <IconPlus size={14} /> Add material
+          </button>
+        )}
+        <span className="faint small">
+          <span className="kbd">Enter</span> in an amount moves to the next row · <span className="kbd">↑</span>/<span className="kbd">↓</span> ±1 (Shift ±10, Alt ±0.1)
+        </span>
+      </div>
+      {rows.length === 0 && !adding && (
+        <div className="empty" style={{ padding: '40px 20px' }}>
+          <div className="mark">00</div>
+          <h3>No materials</h3>
+          <p>Add the first material to start the composition.</p>
+        </div>
+      )}
+    </>
+  )
+}
+
+// ---------------------------------------------------------------- sidebar
+function Sidebar({
+  formula, calc, update, settings
+}: {
+  formula: Formula
+  calc: FormulaCalc
+  update: (fn: (f: Formula) => Formula, history?: boolean) => void
+  settings: Settings
+}) {
+  const b = calc.batch
+  const ifra = calc.ifra
+  const over = ifra.entries.filter((e) => e.status === 'over').length
+  const near = ifra.entries.filter((e) => e.status === 'near').length
+  const cur = settings.currency
+  const setBatch = (patch: Partial<Formula['batch']>) => update((f) => ({ ...f, batch: { ...f.batch, ...patch } }))
+
+  return (
+    <div className="side">
+      <div className="card card-pad">
+        <div className="stats-3">
+          <div className="stat-tile">
+            <div className="k">Total</div>
+            <div className="v">
+              {fmt(calc.totalGrams, calc.totalGrams < 10 ? 3 : 2)}
+              <span className="faint small"> {formula.unit === 'parts' ? 'pt' : 'g'}</span>
+            </div>
+          </div>
+          <div className="stat-tile">
+            <div className="k">Items</div>
+            <div className="v">{calc.materialCount}</div>
+          </div>
+          <div className="stat-tile">
+            <div className="k">Cost/kg</div>
+            <div className="v">{calc.costPerKg > 0 ? `${cur}${fmt(calc.costPerKg, 0)}` : '—'}</div>
+          </div>
+        </div>
+        {calc.solventGrams > 0.00001 && (
+          <div className="stat-row">
+            <span className="k">Neat / solvent</span>
+            <span className="v">
+              {fmtSmart(calc.neatGrams)} / {fmtSmart(calc.solventGrams)}
+            </span>
+          </div>
+        )}
+      </div>
+
+      <div className="card card-pad">
+        <h3 className="card-title">
+          Product <small>{fmt(formula.concentration, 1)}% concentrate</small>
+        </h3>
+        <div className="grid-2">
+          <div className="field">
+            <label>Type</label>
+            <select
+              className="select"
+              value={formula.productType}
+              onChange={(e) => {
+                const t = e.target.value as ProductType
+                update((f) => ({ ...f, productType: t, concentration: t === 'custom' ? f.concentration : PRODUCT_PRESETS[t].concentration }))
+              }}
+            >
+              {Object.entries(PRODUCT_PRESETS).map(([k, p]) => (
+                <option key={k} value={k}>
+                  {p.label}
+                </option>
+              ))}
+              <option value="custom">Custom</option>
+            </select>
+          </div>
+          <div className="field">
+            <label>Concentration</label>
+            <div className="suffix">
+              <NumberInput
+                value={formula.concentration}
+                min={0}
+                max={100}
+                onCommit={(v) => {
+                  const c = v ?? 0
+                  const match = Object.entries(PRODUCT_PRESETS).find(([, p]) => p.concentration === c)?.[0] as ProductType | undefined
+                  update((f) => ({ ...f, concentration: c, productType: match ?? 'custom' }))
+                }}
+              />
+              <span>%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="card card-pad">
+        <h3 className="card-title">
+          Batch
+          <Seg
+            value={formula.batch.mode}
+            onChange={(m) => setBatch({ mode: m })}
+            options={[
+              { value: 'bottles', label: 'Bottles' },
+              { value: 'mass', label: 'Mass' }
+            ]}
+          />
+        </h3>
+        {formula.batch.mode === 'bottles' ? (
+          <div className="grid-2">
+            <div className="field">
+              <label>Bottles</label>
+              <NumberInput value={formula.batch.bottles} min={0} onCommit={(v) => setBatch({ bottles: Math.round(v ?? 0) })} />
+            </div>
+            <div className="field">
+              <label>Size</label>
+              <div className="suffix">
+                <NumberInput value={formula.batch.bottleMl} min={0} onCommit={(v) => setBatch({ bottleMl: v ?? 0 })} />
+                <span>ml</span>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="field">
+            <label>Concentrate to weigh</label>
+            <div className="suffix">
+              <NumberInput value={formula.batch.massG} min={0} onCommit={(v) => setBatch({ massG: v ?? 0 })} />
+              <span>g</span>
+            </div>
+          </div>
+        )}
+        <div className="divider" />
+        <div className="stat-row">
+          <span className="k">Finished product</span>
+          <span className="v">
+            {fmt(b.productMl, 1)} ml · {fmt(b.productG, 1)} g
+          </span>
+        </div>
+        <div className="stat-row">
+          <span className="k">Concentrate</span>
+          <span className="v">{fmt(b.concentrateG, 2)} g</span>
+        </div>
+        <div className="stat-row">
+          <span className="k">Alcohol</span>
+          <span className="v">
+            {fmt(b.alcoholG, 2)} g · {fmt(b.alcoholMl, 1)} ml
+          </span>
+        </div>
+        <div className="stat-row">
+          <span className="k">Scale factor</span>
+          <span className="v">× {fmtSmart(b.scale)}</span>
+        </div>
+        {(b.costTotal > 0 || calc.costPerKg > 0) && (
+          <>
+            <div className="divider" />
+            <div className="stat-row">
+              <span className="k">Batch cost</span>
+              <span className="v">
+                {cur}
+                {fmt(b.costTotal, 2)}
+              </span>
+            </div>
+            {b.costPerBottle != null && (
+              <div className="stat-row">
+                <span className="k">Per bottle</span>
+                <span className="v">
+                  {cur}
+                  {fmt(b.costPerBottle, 2)}
+                </span>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      <div className="card card-pad">
+        <h3 className="card-title">
+          IFRA <small>Category 4</small>
+        </h3>
+        {ifra.entries.length === 0 ? (
+          <div className="muted small">
+            No IFRA limits set for the materials used. Add them in the Library to get live compliance checks.
+          </div>
+        ) : (
+          <>
+            <div
+              className="ifra-summary"
+              style={{
+                background: over ? 'var(--over-bg)' : near ? 'var(--near-bg)' : 'var(--ok-bg)',
+                color: statusColor(over ? 'over' : near ? 'near' : 'ok'),
+                border: over ? '1px solid rgba(180,128,204,.5)' : '1px solid transparent'
+              }}
+            >
+              {over ? <IconAlert /> : <IconCheck />}
+              <span>
+                {over
+                  ? `${over} material${over > 1 ? 's' : ''} over the limit`
+                  : near
+                    ? `Within limits · ${near} close to the limit`
+                    : 'All within entered limits'}
+              </span>
+            </div>
+            {ifra.maxConcentration != null && (
+              <div className="stat-row">
+                <span className="k">Max concentration</span>
+                <span className="v" title={ifra.limiting ? `Limited by ${ifra.limiting.name}` : undefined}>
+                  {fmt(ifra.maxConcentration, 2)}%
+                </span>
+              </div>
+            )}
+            {ifra.limiting && (
+              <div className="faint small" style={{ marginBottom: 8 }}>
+                limited by {ifra.limiting.name}
+              </div>
+            )}
+            <div className="ifra-list">
+              {ifra.entries.map((e) => (
+                <div className="ifra-line" key={e.material.id}>
+                  <span>{e.material.name}</span>
+                  <span className="num muted">
+                    {fmtSmart(e.productPct)} / {fmtSmart(e.limit)}%
+                  </span>
+                  <div className="meter">
+                    <div style={{ width: `${Math.min(100, e.ratio * 100)}%`, background: statusColor(e.status) }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+        <div className="faint small mt">Uses the limits you enter per material — verify against the current IFRA Standards.</div>
+      </div>
+
+      <div className="card card-pad">
+        <h3 className="card-title">Structure</h3>
+        <StructureChart byNote={calc.byNote} settings={settings} />
+      </div>
+      <div className="card card-pad">
+        <h3 className="card-title">Families</h3>
+        <FamilyDonut byFamily={calc.byFamily} settings={settings} />
+      </div>
+      <div className="card card-pad">
+        <h3 className="card-title">Evolution</h3>
+        <EvolutionChart rows={calc.rows} settings={settings} />
+      </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------- notes
+const STAGES: Record<TestStage, string> = { blotter: 'Blotter', skin: 'Skin', fabric: 'Fabric' }
+const PHASES: Record<TestPhase, string> = { opening: 'Opening', heart: 'Heart', drydown: 'Dry-down' }
+
+function Notes({ formula, update }: { formula: Formula; update: (fn: (f: Formula) => Formula, history?: boolean) => void }) {
+  const [text, setText] = useState('')
+  const [stage, setStage] = useState<TestStage>('blotter')
+  const [phase, setPhase] = useState<TestPhase>('opening')
+  const [rating, setRating] = useState(0)
+  const [onlyThis, setOnlyThis] = useState(false)
+  const labels = new Map(formula.versions.map((v) => [v.id, v.label]))
+
+  const add = () => {
+    if (!text.trim()) return
+    const note: TestNote = { id: uid(), date: new Date().toISOString(), versionId: formula.currentVersionId, stage, phase, rating, text: text.trim() }
+    update((f) => ({ ...f, notes: [note, ...f.notes] }))
+    setText('')
+    setRating(0)
+  }
+
+  const notes = formula.notes
+    .filter((n) => !onlyThis || n.versionId === formula.currentVersionId)
+    .sort((a, b) => b.date.localeCompare(a.date))
+
+  return (
+    <div>
+      <div className="card card-pad" style={{ background: 'var(--panel-2)', marginBottom: 16 }}>
+        <div className="row mb" style={{ gap: 10, flexWrap: 'wrap' }}>
+          <span className="label">New note for</span>
+          <span className="tag">{labels.get(formula.currentVersionId)}</span>
+          <select className="select input-sm" style={{ width: 110 }} value={stage} onChange={(e) => setStage(e.target.value as TestStage)}>
+            {Object.entries(STAGES).map(([k, v]) => (
+              <option key={k} value={k}>
+                {v}
+              </option>
+            ))}
+          </select>
+          <select className="select input-sm" style={{ width: 120 }} value={phase} onChange={(e) => setPhase(e.target.value as TestPhase)}>
+            {Object.entries(PHASES).map(([k, v]) => (
+              <option key={k} value={k}>
+                {v}
+              </option>
+            ))}
+          </select>
+          <Stars value={rating} onChange={setRating} />
+        </div>
+        <textarea
+          className="textarea"
+          placeholder="Impressions, what to change in the next mod… (Ctrl+Enter to save)"
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && e.ctrlKey && add()}
+        />
+        <div className="row mt">
+          <div className="spacer" />
+          <button className="btn btn-primary btn-sm" onClick={add} disabled={!text.trim()}>
+            Add note
+          </button>
+        </div>
+      </div>
+
+      <div className="row mb">
+        <label className="row small muted" style={{ gap: 6, cursor: 'pointer' }}>
+          <input type="checkbox" checked={onlyThis} onChange={(e) => setOnlyThis(e.target.checked)} /> Only notes for the current version
+        </label>
+      </div>
+      <div className="col" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {notes.map((n) => (
+          <div key={n.id} className="card note-card">
+            <div className="when">
+              <span className="tag">{labels.get(n.versionId) ?? '—'}</span>
+              <span>{new Date(n.date).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' })}</span>
+              <span>·</span>
+              <span>{STAGES[n.stage]}</span>
+              <span>·</span>
+              <span>{PHASES[n.phase]}</span>
+              {n.rating > 0 && <Stars value={n.rating} />}
+            </div>
+            <button
+              className="btn btn-ghost btn-icon btn-danger"
+              title="Delete note"
+              onClick={() => update((f) => ({ ...f, notes: f.notes.filter((x) => x.id !== n.id) }))}
+            >
+              <IconTrash size={14} />
+            </button>
+            <p>{n.text}</p>
+          </div>
+        ))}
+        {notes.length === 0 && <div className="muted small">No test notes yet.</div>}
+      </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------- details
+function Details({ formula, update }: { formula: Formula; update: (fn: (f: Formula) => Formula, history?: boolean) => void }) {
+  const [desc, setDesc] = useState(formula.description)
+  const v = currentVersion(formula)
+  const [comment, setComment] = useState(v.comment ?? '')
+  useEffect(() => setDesc(formula.description), [formula.description])
+  useEffect(() => setComment(v.comment ?? ''), [v.id, v.comment])
+
+  const macDays = formula.macerationStart
+    ? Math.floor((Date.now() - new Date(formula.macerationStart).getTime()) / 86400000)
+    : null
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 720 }}>
+      <div className="field">
+        <label>Description / brief</label>
+        <textarea
+          className="textarea"
+          rows={4}
+          value={desc}
+          placeholder="Concept, inspiration, target audience…"
+          onChange={(e) => setDesc(e.target.value)}
+          onBlur={() => desc !== formula.description && update((f) => ({ ...f, description: desc }))}
+        />
+      </div>
+      <div className="field">
+        <label>Comment for {v.label}</label>
+        <textarea
+          className="textarea"
+          rows={2}
+          value={comment}
+          placeholder="What changed in this modification?"
+          onChange={(e) => setComment(e.target.value)}
+          onBlur={() =>
+            comment !== (v.comment ?? '') &&
+            update((f) => ({ ...f, versions: f.versions.map((x) => (x.id === v.id ? { ...x, comment } : x)) }))
+          }
+        />
+      </div>
+      <div className="grid-2">
+        <div className="field">
+          <label>Maceration started</label>
+          <input
+            type="date"
+            className="input"
+            value={formula.macerationStart?.slice(0, 10) ?? ''}
+            onChange={(e) => update((f) => ({ ...f, macerationStart: e.target.value || undefined }))}
+          />
+          {macDays != null && macDays >= 0 && (
+            <span className="hint">
+              Macerating for {macDays} day{macDays === 1 ? '' : 's'}
+            </span>
+          )}
+        </div>
+        <div className="field">
+          <label>History</label>
+          <div className="small muted" style={{ lineHeight: 1.9 }}>
+            Created {new Date(formula.createdAt).toLocaleString('en-GB')}
+            <br />
+            Last edited {new Date(formula.updatedAt).toLocaleString('en-GB')}
+            <br />
+            {formula.versions.length} version{formula.versions.length === 1 ? '' : 's'} · {formula.notes.length} test note{formula.notes.length === 1 ? '' : 's'}
+          </div>
+        </div>
+      </div>
+      <div className="field">
+        <label>Version timeline</label>
+        <div style={{ borderLeft: '1px solid var(--line)', marginLeft: 6, paddingLeft: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {[...formula.versions].reverse().map((x) => (
+            <div key={x.id} style={{ position: 'relative' }}>
+              <span
+                className="dot"
+                style={{
+                  position: 'absolute', left: -21, top: 5,
+                  background: x.id === formula.currentVersionId ? 'var(--accent-hi)' : 'var(--line)'
+                }}
+              />
+              <div className="row">
+                <b style={{ fontWeight: 500 }}>{x.label}</b>
+                <span className="faint small">{new Date(x.createdAt).toLocaleDateString('en-GB')}</span>
+                <span className="faint small">· {x.rows.length} rows</span>
+              </div>
+              {x.comment && <div className="small muted">{x.comment}</div>}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
