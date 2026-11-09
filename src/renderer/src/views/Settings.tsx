@@ -19,7 +19,7 @@ export function SettingsView() {
   const replaceAll = useStore((s) => s.replaceAll)
   const resetAll = useStore((s) => s.resetAll)
 
-  /** Restore a library export, a settings export or an old full backup — only what the file contains is replaced. */
+  /** Restore a formulas, materials or settings export (or an old full backup) — only what the file contains is replaced. */
   async function restoreFromFile() {
     const text = await window.vialintia.importJson()
     if (!text) return
@@ -29,17 +29,20 @@ export function SettingsView() {
     } catch {
       return toast('That file is not a Vialintia export')
     }
-    const hasLib = Array.isArray(data.materials) || Array.isArray(data.formulas)
+    const hasMaterials = Array.isArray(data.materials)
+    const hasFormulas = Array.isArray(data.formulas)
     const hasSettings = !!data.settings && typeof data.settings === 'object'
-    if (!hasLib && !hasSettings) return toast('That file is not a Vialintia export')
+    if (!hasMaterials && !hasFormulas && !hasSettings) return toast('That file is not a Vialintia export')
     const parts = [
-      hasLib ? `${data.formulas?.length ?? 0} formulas and ${data.materials?.length ?? 0} materials` : null,
+      hasFormulas ? `${data.formulas!.length} formulas` : null,
+      hasMaterials ? `${data.materials!.length} materials` : null,
       hasSettings ? 'settings' : null
     ].filter(Boolean)
-    const ok = await confirmDialog('Restore from file?', `This replaces your current ${parts.join(' and ')} with the ones in the file.`, 'Restore')
+    const note = hasMaterials && !hasFormulas && formulas.length ? ' Formula rows whose material is not in the file will show as missing.' : ''
+    const ok = await confirmDialog('Restore from file?', `This replaces your current ${parts.join(', ')} with the ones in the file.${note}`, 'Restore')
     if (!ok) return
     replaceAll(data)
-    toast(hasLib && hasSettings ? 'Backup restored' : hasLib ? 'Formulas & materials restored' : 'Settings restored')
+    toast(`Restored ${parts.join(', ')}`)
   }
   const updateMaterial = useStore((s) => s.updateMaterial)
   const [newFamily, setNewFamily] = useState('')
@@ -245,12 +248,23 @@ export function SettingsView() {
                 className="btn"
                 onClick={async () => {
                   const stamp = new Date().toISOString().slice(0, 10)
-                  const file = { app: 'Vialintia', kind: 'library', version: 1, seedVersion: settings.seedVersion, materials, formulas }
-                  const p = await window.vialintia.exportJson(JSON.stringify(file, null, 2), `vialintia-library-${stamp}.json`)
-                  if (p) toast('Formulas & materials exported')
+                  const file = { app: 'Vialintia', kind: 'formulas', version: 1, formulas }
+                  const p = await window.vialintia.exportJson(JSON.stringify(file, null, 2), `vialintia-formulas-${stamp}.json`)
+                  if (p) toast('Formulas exported')
                 }}
               >
-                <IconDownload /> Export formulas & materials
+                <IconDownload /> Export formulas
+              </button>
+              <button
+                className="btn"
+                onClick={async () => {
+                  const stamp = new Date().toISOString().slice(0, 10)
+                  const file = { app: 'Vialintia', kind: 'materials', version: 1, seedVersion: settings.seedVersion, materials }
+                  const p = await window.vialintia.exportJson(JSON.stringify(file, null, 2), `vialintia-materials-${stamp}.json`)
+                  if (p) toast('Materials exported')
+                }}
+              >
+                <IconDownload /> Export materials
               </button>
               <button
                 className="btn"
