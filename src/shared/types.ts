@@ -1,6 +1,6 @@
 export type NoteLevel = 'top' | 'heart' | 'base'
 export type MaterialType = 'natural' | 'synthetic' | 'base' | 'other'
-export type AmountUnit = 'g' | 'drops' | 'parts'
+export type AmountUnit = 'g' | 'drops'
 export type FormulaStatus = 'testing' | 'final'
 export type ProductType = 'parfum' | 'edp' | 'edt' | 'edc' | 'custom'
 
@@ -85,8 +85,8 @@ export interface AssemblyRow {
   rowId: string
   materialId: string
   dilution: number
-  target: number // g to weigh (already rounded to the balance step)
-  actual: number | null // g actually weighed
+  target: number // g to weigh (rounded to the balance step) or drops to count, see Assembly.unit
+  actual: number | null // g actually weighed / drops actually added
 }
 
 export interface Assembly {
@@ -98,6 +98,8 @@ export interface Assembly {
   alcoholG: number // target alcohol mass
   alcoholActual: number | null
   rows: AssemblyRow[]
+  /** Unit of row targets / actuals: grams on the balance or counted drops (alcohol is always g). */
+  unit?: 'g' | 'drops'
   note?: string
 }
 

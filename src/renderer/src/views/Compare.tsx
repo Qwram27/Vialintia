@@ -1,11 +1,14 @@
-import { useMemo } from 'react'
-import type { Formula } from '@shared/types'
+import { Fragment, useMemo, useState } from 'react'
+import type { Formula, NoteLevel } from '@shared/types'
 import { NOTE_LABELS, NOTE_ORDER } from '@shared/defaults'
 import { familyById, useAccordIndex, useMaterialMap, useStore } from '@/store/store'
 import { navigate } from '@/store/ui'
-import { computeFormula, diffVersions, fmt, fmtSmart, inkOn, type DiffKind } from '@/lib/calc'
+import { computeFormula, DEFAULT_TENACITY, diffVersions, fmt, fmtSmart, fmtTrim, type DiffKind, type DiffRow } from '@/lib/calc'
+import { Seg } from '@/components/Seg'
 
 const KIND_LABEL: Record<DiffKind, string> = { added: 'Added', removed: 'Removed', changed: 'Changed', same: '' }
+const VOLATILITY: Record<NoteLevel, string> = { top: 'most volatile', heart: 'middle', base: 'most tenacious' }
+const signed = (v: number) => (Math.abs(v) < 0.0005 ? '·' : `${v > 0 ? '+' : '−'}${fmtSmart(Math.abs(v))}`)
 
 // Selection encoded as "formulaId:versionId"
 function parseSel(s: string | undefined, formulas: Formula[]) {
@@ -22,6 +25,7 @@ export function Compare({ a, b }: { a?: string; b?: string }) {
   const settings = useStore((s) => s.settings)
   const materials = useMaterialMap()
   const accords = useAccordIndex()
+  const [show, setShow] = useState<'all' | 'changes'>('all')
 
   // Sensible defaults: last two versions of the given (or most recent) formula.
   const selA = useMemo(() => {
@@ -68,13 +72,38 @@ export function Compare({ a, b }: { a?: string; b?: string }) {
 
   const changes = diff.filter((d) => d.kind !== 'same').length
 
+  // Note structure of each side, in % of the neat concentrate.
+  const share = (c: typeof calcA) => {
+    const t = c ? c.byNote.top + c.byNote.heart + c.byNote.base : 0
+    return (n: NoteLevel) => (c && t > 0 ? (c.byNote[n] / t) * 100 : 0)
+  }
+  const sa = share(calcA)
+  const sb = share(calcB)
+
+  // Diff rows grouped by note, most volatile first; inside a group by tenacity, then by size.
+  const life = (d: DiffRow) => {
+    const m = materials.get(d.materialId)
+    return m ? m.tenacityHours || DEFAULT_TENACITY[m.note] : Infinity
+  }
+  const groups = ([...NOTE_ORDER, 'other'] as const)
+    .map((g) => {
+      const all = diff.filter((d) => (materials.get(d.materialId)?.note ?? 'other') === g)
+      const rows = all
+        .filter((d) => show === 'all' || d.kind !== 'same')
+        .sort((x, y) => life(x) - life(y) || Math.max(y.a ?? 0, y.b ?? 0) - Math.max(x.a ?? 0, x.b ?? 0))
+      const a = all.reduce((s, d) => s + (d.a ?? 0), 0)
+      const b = all.reduce((s, d) => s + (d.b ?? 0), 0)
+      return { g, rows, a, b, changed: all.filter((d) => d.kind !== 'same').length }
+    })
+    .filter((x) => x.rows.length > 0)
+
   return (
     <div className="page">
       <div className="page-head">
         <div>
           <div className="page-kicker">Versions · Side by side</div>
           <h1 className="page-title">Analyze</h1>
-          <div className="page-sub">Neat material share in the concentrate, side by side · {changes} difference{changes === 1 ? '' : 's'}</div>
+          <div className="page-sub">Neat share in the concentrate, grouped by volatility · {changes} difference{changes === 1 ? '' : 's'}</div>
         </div>
       </div>
 
@@ -83,7 +112,6 @@ export function Compare({ a, b }: { a?: string; b?: string }) {
           { label: 'A', key: keyA, set: (k: string) => go(k, keyB), calc: calcA, sel: selA },
           { label: 'B', key: keyB, set: (k: string) => go(keyA, k), calc: calcB, sel: selB }
         ].map((side) => {
-          const total = side.calc ? side.calc.byNote.top + side.calc.byNote.heart + side.calc.byNote.base : 0
           return (
             <div key={side.label} className="card card-pad">
               <div className="row mb">
@@ -104,12 +132,7 @@ export function Compare({ a, b }: { a?: string; b?: string }) {
                     <span>{side.calc.materialCount} materials</span>
                     <span>{side.sel.f.concentration}% concentration</span>
                     {side.calc.costPerKg > 0 && <span>{settings.currency}{fmt(side.calc.costPerKg, 0)}/kg</span>}
-                    {NOTE_ORDER.map((n) => (
-                      <span key={n} className="row" style={{ gap: 5 }}>
-                        <span className="dot" style={{ background: settings.noteColors[n], width: 7, height: 7 }} />
-                        {NOTE_LABELS[n]} {total > 0 ? fmt((side.calc!.byNote[n] / total) * 100, 0) : 0}%
-                      </span>
-                    ))}
+
                   </div>
                   {side.sel.v.comment && <div className="small faint mt">{side.sel.v.comment}</div>}
                   <button className="btn btn-ghost btn-sm mt" style={{ marginLeft: -10 }} onClick={() => navigate(`/formula/${side.sel!.f.id}`)}>
@@ -122,12 +145,54 @@ export function Compare({ a, b }: { a?: string; b?: string }) {
         })}
       </div>
 
+      <div className="card card-pad cmp-struct">
+        <h3 className="card-title">
+          Structure <small>top → base · share of the neat concentrate</small>
+        </h3>
+        {NOTE_ORDER.map((n) => (
+          <div key={n} className="cmp-struct-row">
+            <span className="cmp-struct-name">
+              <span className="dot" style={{ background: settings.noteColors[n] }} />
+              {NOTE_LABELS[n]}
+              <small>{VOLATILITY[n]}</small>
+            </span>
+            <span className="cmp-bars">
+              {[
+                { k: 'A', v: sa(n) },
+                { k: 'B', v: sb(n) }
+              ].map((x) => (
+                <span key={x.k} className="cmp-bar">
+                  <span className="k">{x.k}</span>
+                  <span className="track">
+                    <span style={{ width: `${Math.min(100, x.v)}%`, background: settings.noteColors[n] }} />
+                  </span>
+                  <span className="v">{fmt(x.v, 1)}%</span>
+                </span>
+              ))}
+            </span>
+            <span className={`cmp-struct-d ${sb(n) - sa(n) > 0.05 ? 'delta-up' : 'delta-down'}`}>{Math.abs(sb(n) - sa(n)) < 0.05 ? '·' : `${sb(n) > sa(n) ? '+' : '−'}${fmt(Math.abs(sb(n) - sa(n)), 1)}`}</span>
+          </div>
+        ))}
+      </div>
+
+      <div className="row mb" style={{ gap: 10 }}>
+        <span className="label">Materials</span>
+        <Seg
+          value={show}
+          onChange={setShow}
+          options={[
+            { value: 'all', label: `All ${diff.length}` },
+            { value: 'changes', label: `Changes ${changes}` }
+          ]}
+        />
+      </div>
+
       <div className="card" style={{ padding: '4px 12px 10px' }}>
         <table className="ftable cmp-table">
           <thead>
             <tr>
               <th className="l">Material</th>
-              <th className="l">Note</th>
+              <th title="Tenacity on a blotter (TGSC substantivity) — fastest first within each group">Life h</th>
               <th>A %</th>
               <th>B %</th>
               <th>Δ</th>
@@ -137,44 +202,56 @@ export function Compare({ a, b }: { a?: string; b?: string }) {
             </tr>
           </thead>
           <tbody>
-            {diff.map((d) => {
-              const m = materials.get(d.materialId)
-              const fam = m ? familyById(settings, m.family) : null
-              return (
-                <tr key={d.materialId} className={d.kind === 'added' ? 'diff-added' : d.kind === 'removed' ? 'diff-removed' : ''}>
+            {groups.map((grp) => (
+              <Fragment key={grp.g}>
+                <tr className="sec-row cmp-group">
                   <td className="l">
-                    <div className="row">
-                      <span className="dot" style={{ background: fam?.color ?? 'var(--faint)' }} />
-                      {m?.name ?? 'Missing material'}
-                    </div>
-                  </td>
-                  <td className="l">
-                    {m && (
-                      <span className="note-pill" style={{ background: settings.noteColors[m.note], color: inkOn(settings.noteColors[m.note]) }}>
-                        {NOTE_LABELS[m.note]}
-                      </span>
-                    )}
-                  </td>
-                  <td className={d.a == null ? 'dim' : ''}>{d.a == null ? '—' : fmtSmart(d.a)}</td>
-                  <td className={d.b == null ? 'dim' : ''}>{d.b == null ? '—' : fmtSmart(d.b)}</td>
-                  <td className={d.kind === 'same' ? 'dim' : d.delta > 0 ? 'delta-up' : 'delta-down'}>
-                    {d.kind === 'same' ? '·' : `${d.delta > 0 ? '+' : '−'}${fmtSmart(Math.abs(d.delta))}`}
-                  </td>
-                  <td className="l">
-                    <span
-                      className="diff-kind"
-                      style={{
-                        color: d.kind === 'added' ? 'var(--ok)' : d.kind === 'removed' ? 'var(--over)' : d.kind === 'changed' ? 'var(--near)' : 'var(--faint)'
-                      }}
-                    >
-                      {d.kind === 'changed' ? (d.delta > 0 ? '▲ More' : '▼ Less') : d.kind === 'added' ? '+ Added' : d.kind === 'removed' ? '− Removed' : KIND_LABEL[d.kind]}
+                    <span className="sec-title">
+                      {grp.g === 'other' ? 'Missing materials' : `${NOTE_LABELS[grp.g]} notes`}
                     </span>
+                    {grp.g !== 'other' && <small>{VOLATILITY[grp.g]}</small>}
+                  </td>
+                  <td />
+                  <td>{fmtSmart(grp.a)}</td>
+                  <td>{fmtSmart(grp.b)}</td>
+                  <td className={Math.abs(grp.b - grp.a) < 0.0005 ? 'dim' : grp.b > grp.a ? 'delta-up' : 'delta-down'}>{signed(grp.b - grp.a)}</td>
+                  <td className="l">
+                    <small>{grp.changed ? `${grp.changed} change${grp.changed > 1 ? 's' : ''}` : 'unchanged'}</small>
                   </td>
                 </tr>
-              )
-            })}
+                {grp.rows.map((d) => {
+                  const m = materials.get(d.materialId)
+                  const fam = m ? familyById(settings, m.family) : null
+                  return (
+                    <tr key={d.materialId} className={d.kind === 'added' ? 'diff-added' : d.kind === 'removed' ? 'diff-removed' : ''}>
+                      <td className="l">
+                        <div className="row">
+                          <span className="dot" style={{ background: fam?.color ?? 'var(--faint)' }} />
+                          {m?.name ?? 'Missing material'}
+                        </div>
+                      </td>
+                      <td className="muted">{m?.tenacityHours ? fmtTrim(m.tenacityHours) : <span className="dim">—</span>}</td>
+                      <td className={d.a == null ? 'dim' : ''}>{d.a == null ? '—' : fmtSmart(d.a)}</td>
+                      <td className={d.b == null ? 'dim' : ''}>{d.b == null ? '—' : fmtSmart(d.b)}</td>
+                      <td className={d.kind === 'same' ? 'dim' : d.delta > 0 ? 'delta-up' : 'delta-down'}>{d.kind === 'same' ? '·' : signed(d.delta)}</td>
+                      <td className="l">
+                        <span
+                          className="diff-kind"
+                          style={{
+                            color: d.kind === 'added' ? 'var(--ok)' : d.kind === 'removed' ? 'var(--over)' : d.kind === 'changed' ? 'var(--near)' : 'var(--faint)'
+                          }}
+                        >
+                          {d.kind === 'changed' ? (d.delta > 0 ? '▲ More' : '▼ Less') : d.kind === 'added' ? '+ Added' : d.kind === 'removed' ? '− Removed' : KIND_LABEL[d.kind]}
+                        </span>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </Fragment>
+            ))}
           </tbody>
         </table>
+        {diff.length > 0 && groups.length === 0 && <div className="empty">No differences — both versions are the same.</div>}
         {diff.length === 0 && <div className="empty">Both selections are empty.</div>}
       </div>
     </div>

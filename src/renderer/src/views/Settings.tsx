@@ -338,8 +338,6 @@ export function SettingsView() {
             <div className="muted small" style={{ lineHeight: 1.7 }}>
               Vialintia {APP_VERSION} — fine fragrance formulation archive.
               <br />
-              Build {typeof __BUILD_TIME__ === 'string' ? new Date(__BUILD_TIME__).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' }) : 'dev'}
-              <br />
               Percentages: <b>Weighed %</b> is the share of what you put on the scale; <b>In product %</b> is the neat material in the finished
               perfume after dilution and the chosen concentration — the figure IFRA limits apply to.
             </div>

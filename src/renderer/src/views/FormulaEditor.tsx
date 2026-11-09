@@ -23,7 +23,8 @@ import {
 } from '@/components/Icons'
 
 const STATUS_LABEL: Record<FormulaStatus, string> = { testing: 'Testing', final: 'Final' }
-const UNIT_LABEL: Record<AmountUnit, string> = { g: 'g', drops: 'drops', parts: 'parts' }
+const UNIT_LABEL: Record<AmountUnit, string> = { g: 'g', drops: 'drops' }
+const UNIT_NAME: Record<AmountUnit, string> = { g: 'Weight', drops: 'Drops' }
 
 export function FormulaEditor({ id }: { id: string }) {
   const formula = useStore((s) => s.formulas.find((f) => f.id === id))
@@ -686,7 +687,7 @@ function Composition({
         <Seg
           value={formula.unit}
           onChange={(u) => update((f) => ({ ...f, unit: u }))}
-          options={(['g', 'drops', 'parts'] as const).map((u) => ({ value: u, label: UNIT_LABEL[u] }))}
+          options={(['g', 'drops'] as const).map((u) => ({ value: u, label: UNIT_NAME[u] }))}
         />
         {formula.unit === 'drops' && <span className="faint small">1 drop = {settings.dropMassG} g</span>}
         <div className="spacer" />
@@ -935,7 +936,7 @@ function MobileComposition({
         <Seg
           value={formula.unit}
           onChange={(u) => update((f) => ({ ...f, unit: u }))}
-          options={(['g', 'drops', 'parts'] as const).map((u) => ({ value: u, label: UNIT_LABEL[u] }))}
+          options={(['g', 'drops'] as const).map((u) => ({ value: u, label: UNIT_NAME[u] }))}
         />
         <div className="spacer" />
         <button className="btn btn-ghost btn-sm" onClick={sortByNote} disabled={rows.length < 2}>
@@ -1440,7 +1441,7 @@ function Collapsible({
 
 // ---------------------------------------------------------------- notes
 const STAGES: Record<TestStage, string> = { blotter: 'Blotter', skin: 'Skin', fabric: 'Fabric' }
-const PHASES: Record<TestPhase, string> = { opening: 'Opening', heart: 'Heart', drydown: 'Dry-down' }
+const PHASES: Record<TestPhase, string> = { opening: 'Opening', heart: 'Evolution', drydown: 'End' }
 
 function Notes({ formula, update }: { formula: Formula; update: (fn: (f: Formula) => Formula, history?: boolean) => void }) {
   const [text, setText] = useState('')
