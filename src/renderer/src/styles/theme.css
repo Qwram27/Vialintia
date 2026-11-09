@@ -888,3 +888,18 @@ svg text { font-family: var(--mono); }
 @media (max-width: 700px) {
   .tabbar { background: rgba(8, 8, 9, .94); }
 }
+
+/* ─────────────────────────────────────────────────────────────
+   1.4.7 — selected / primary fill: soft pearl grey instead of bright white
+   ───────────────────────────────────────────────────────────── */
+:root {
+  --fill: #c9ccd0;       /* selected segment, active version chip, primary button */
+  --fill-hi: #d6d9dc;    /* hover */
+  --fill-ink: #0b0b0c;   /* text on the fill */
+}
+.seg-thumb { background: var(--fill); box-shadow: inset 0 1px 0 rgba(255,255,255,.35), 0 1px 3px rgba(0,0,0,.35); }
+.seg button.on, .seg button.on:hover { color: var(--fill-ink); }
+.seg button.on .count, .seg button.on .faint { color: rgba(11,11,12,.5); }
+.btn-primary { background: var(--fill); border-color: var(--fill); color: var(--fill-ink); box-shadow: inset 0 1px 0 rgba(255,255,255,.35); }
+.btn-primary:hover { background: var(--fill-hi); border-color: var(--fill-hi); }
+.vchip.on { background: var(--fill); border-color: var(--fill); color: var(--fill-ink); }
