@@ -5,6 +5,7 @@ import { create } from 'zustand'
 export type Route =
   | { name: 'dashboard' }
   | { name: 'formula'; id: string }
+  | { name: 'assemble'; id: string }
   | { name: 'library' }
   | { name: 'compare'; a?: string; b?: string }
   | { name: 'settings' }
@@ -15,6 +16,7 @@ export function parseHash(hash: string): Route {
   const q = new URLSearchParams(query)
   switch (parts[0]) {
     case 'formula':
+      if (parts[1] && parts[2] === 'assemble') return { name: 'assemble', id: parts[1] }
       return parts[1] ? { name: 'formula', id: parts[1] } : { name: 'dashboard' }
     case 'library':
       return { name: 'library' }

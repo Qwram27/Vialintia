@@ -18,6 +18,7 @@ export interface Material {
   ifraLimit?: number | null // max % in finished product (IFRA Cat. 4)
   description?: string
   type: MaterialType
+  accordFormulaId?: string // set when this material is an accord built from a formula
   createdAt: string
   updatedAt: string
 }
@@ -72,8 +73,29 @@ export interface Formula {
   versions: FormulaVersion[]
   currentVersionId: string
   notes: TestNote[]
+  assemblies?: Assembly[] // weighing sessions; the last one without finishedAt is in progress
   createdAt: string
   updatedAt: string
+}
+
+export interface AssemblyRow {
+  rowId: string
+  materialId: string
+  dilution: number
+  target: number // g to weigh (already rounded to the balance step)
+  actual: number | null // g actually weighed
+}
+
+export interface Assembly {
+  id: string
+  versionId: string
+  startedAt: string
+  finishedAt?: string
+  concentrateG: number // target concentrate mass
+  alcoholG: number // target alcohol mass
+  alcoholActual: number | null
+  rows: AssemblyRow[]
+  note?: string
 }
 
 export interface Family {
@@ -94,6 +116,7 @@ export interface Settings {
   families: Family[]
   solvents: string[]
   prefsVersion?: number // settings migrations already applied
+  balanceStep: number // resolution of the user's scale in g (0.1 / 0.01 / 0.001)
   seedVersion?: number // starter-library version already merged into this library
 }
 

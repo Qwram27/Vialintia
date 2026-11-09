@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import type { FormulaStatus } from '@shared/types'
-import { currentVersion, useMaterialMap, useStore } from '@/store/store'
+import { currentVersion, useAccordIndex, useMaterialMap, useStore } from '@/store/store'
 import { confirmDialog, navigate, toast } from '@/store/ui'
 import { computeFormula } from '@/lib/calc'
 import { catalogNo, seasonCode, shortDate } from '@/lib/archive'
@@ -17,6 +17,7 @@ export function Dashboard() {
   const duplicateFormula = useStore((s) => s.duplicateFormula)
   const deleteFormula = useStore((s) => s.deleteFormula)
   const materials = useMaterialMap()
+  const accords = useAccordIndex()
   const [q, setQ] = useState('')
   const [status, setStatus] = useState<FormulaStatus | 'all'>('all')
   const [sort, setSort] = useState<'updated' | 'name' | 'number'>('updated')
@@ -57,9 +58,9 @@ export function Dashboard() {
       )
       .map((f) => {
         const v = currentVersion(f)
-        return { f, v, no: catalogNo(f, formulas), calc: computeFormula(f, v.rows, materials, settings) }
+        return { f, v, no: catalogNo(f, formulas), calc: computeFormula(f, v.rows, materials, settings, accords) }
       })
-  }, [formulas, materials, settings, q, status, sort])
+  }, [formulas, materials, settings, accords, q, status, sort])
 
   const counts = useMemo(() => {
     const c = { all: formulas.length, draft: 0, testing: 0, final: 0 }

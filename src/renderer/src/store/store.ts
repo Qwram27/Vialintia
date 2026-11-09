@@ -3,6 +3,7 @@ import { DEFAULT_FAMILIES, DEFAULT_NOTE_COLORS, DEFAULT_SETTINGS, LEGACY_DEFAULT
 import type { AppData, Formula, FormulaRow, FormulaVersion, Material, Settings } from '@shared/types'
 import { SEED_VERSION, seedMaterials, upgradeSeedLibrary } from '@/data/seedMaterials'
 import { uid } from '@/lib/id'
+import { buildAccordIndex, type AccordIndex } from '@/lib/calc'
 
 interface History {
   past: Formula[]
@@ -84,6 +85,7 @@ function normalizeFormula(f: Formula): Formula {
     }),
     tags: f.tags ?? [],
     notes: f.notes ?? [],
+    assemblies: f.assemblies ?? [],
     description: f.description ?? '',
     batch: { ...{ mode: 'bottles' as const, bottles: 1, bottleMl: 50, massG: 10 }, ...(f.batch ?? {}) },
     currentVersionId: versions.some((v) => v.id === f.currentVersionId) ? f.currentVersionId : versions[versions.length - 1].id
@@ -368,6 +370,16 @@ function useMemoMap(list: Material[]): Map<string, Material> {
     lastMap = new Map(list.map((m) => [m.id, m]))
   }
   return lastMap
+}
+
+/** Accord materials resolved into their constituents (memoised on materials/formulas/settings). */
+let accCache: { m: Material[]; f: Formula[]; s: Settings; index: AccordIndex } | null = null
+export function useAccordIndex(): AccordIndex {
+  const m = useStore((s) => s.materials)
+  const f = useStore((s) => s.formulas)
+  const st = useStore((s) => s.settings)
+  if (!accCache || accCache.m !== m || accCache.f !== f || accCache.s !== st) accCache = { m, f, s: st, index: buildAccordIndex(m, f, st) }
+  return accCache.index
 }
 
 export function familyById(settings: Settings, id: string) {

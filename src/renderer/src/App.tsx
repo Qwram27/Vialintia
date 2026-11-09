@@ -4,6 +4,7 @@ import { navigate, useRoute, type Route } from '@/store/ui'
 import { catalogNo } from '@/lib/archive'
 import { Dashboard } from '@/views/Dashboard'
 import { FormulaEditor } from '@/views/FormulaEditor'
+import { Assemble } from '@/views/Assemble'
 import { Library } from '@/views/Library'
 import { Compare } from '@/views/Compare'
 import { SettingsView } from '@/views/Settings'
@@ -43,13 +44,13 @@ export function App() {
   // Reset scroll on navigation.
   useEffect(() => {
     mainRef.current?.scrollTo({ top: 0 })
-  }, [route.name, route.name === 'formula' ? route.id : ''])
+  }, [route.name, route.name === 'formula' || route.name === 'assemble' ? route.id : ''])
 
   const recent = useMemo(() => [...formulas].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 6), [formulas])
 
   if (!ready) return <div style={{ height: '100%', background: '#000' }} />
 
-  const active = route.name === 'formula' ? 'dashboard' : route.name
+  const active = route.name === 'formula' || route.name === 'assemble' ? 'dashboard' : route.name
 
   return (
     <div className="app">
@@ -104,6 +105,7 @@ export function App() {
         {!mobile && <TopBar route={route} scrolled={scrolled} />}
         {route.name === 'dashboard' && <Dashboard />}
         {route.name === 'formula' && <FormulaEditor key={route.id} id={route.id} />}
+        {route.name === 'assemble' && <Assemble key={route.id} id={route.id} />}
         {route.name === 'library' && <Library />}
         {route.name === 'compare' && <Compare a={route.a} b={route.b} />}
         {route.name === 'settings' && <SettingsView />}
@@ -133,8 +135,8 @@ function TopBar({ route, scrolled }: { route: Route; scrolled: boolean }) {
   const formulas = useStore((s) => s.formulas)
   const saving = useSaveState((s) => s.saving)
   const error = useSaveState((s) => s.error)
-  const formula = route.name === 'formula' ? formulas.find((f) => f.id === route.id) : undefined
-  const idx = NAV.findIndex((n) => n.key === (route.name === 'formula' ? 'dashboard' : route.name))
+  const formula = route.name === 'formula' || route.name === 'assemble' ? formulas.find((f) => f.id === route.id) : undefined
+  const idx = NAV.findIndex((n) => n.key === (route.name === 'formula' || route.name === 'assemble' ? 'dashboard' : route.name))
   const section = NAV[idx]
 
   return (
@@ -148,9 +150,17 @@ function TopBar({ route, scrolled }: { route: Route; scrolled: boolean }) {
               {section.label}
             </button>
             <span className="sep">/</span>
-            <span className="cur">
-              N°{catalogNo(formula, formulas)} {formula.name}
-            </span>
+            {route.name === 'assemble' ? (
+              <>
+                <button onClick={() => navigate(`/formula/${formula.id}`)}>N°{catalogNo(formula, formulas)} {formula.name}</button>
+                <span className="sep">/</span>
+                <span className="cur">Assemble</span>
+              </>
+            ) : (
+              <span className="cur">
+                N°{catalogNo(formula, formulas)} {formula.name}
+              </span>
+            )}
           </>
         ) : (
           <span className="cur">

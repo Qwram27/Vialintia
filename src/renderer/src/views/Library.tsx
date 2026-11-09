@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { Material, MaterialType, NoteLevel } from '@shared/types'
 import { NOTE_LABELS, NOTE_ORDER } from '@shared/defaults'
-import { familyById, useStore } from '@/store/store'
-import { confirmDialog, toast } from '@/store/ui'
-import { fmt, fmtTrim, inkOn } from '@/lib/calc'
+import { familyById, useAccordIndex, useStore } from '@/store/store'
+import { confirmDialog, navigate, toast } from '@/store/ui'
+import { catalogNo } from '@/lib/archive'
+import { fmt, fmtSmart, fmtTrim, inkOn } from '@/lib/calc'
 import { csvToMaterials, materialsToCsv } from '@/lib/exports'
 import { NumberInput } from '@/components/NumberInput'
 import { Seg } from '@/components/Seg'
@@ -309,6 +310,7 @@ function MaterialDrawer({ material, usage, onClose }: { material: Material; usag
         </button>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 13 }}>
+        {material.accordFormulaId && <AccordInfoBox material={material} />}
         <div className="field">
           <label>Name</label>
           {text('name')}
@@ -421,6 +423,55 @@ function MaterialDrawer({ material, usage, onClose }: { material: Material; usag
           </button>
         </div>
       </div>
+    </div>
+  )
+}
+
+/** Accord materials: where the composition comes from and what is inside (for IFRA). */
+function AccordInfoBox({ material }: { material: Material }) {
+  const formulas = useStore((s) => s.formulas)
+  const accords = useAccordIndex()
+  const f = formulas.find((x) => x.id === material.accordFormulaId)
+  const info = accords.get(material.id)
+  const parts = [...(info?.parts ?? [])].sort((a, b) => b.fraction - a.fraction)
+  return (
+    <div className="accord-box">
+      <div className="row">
+        <span className="label">Accord</span>
+        <div className="spacer" />
+        {f ? (
+          <button className="btn btn-sm" onClick={() => navigate(`/formula/${f.id}`)}>
+            Open N°{catalogNo(f, formulas)}
+          </button>
+        ) : (
+          <span className="faint small">linked formula deleted</span>
+        )}
+      </div>
+      {f && (
+        <>
+          <div className="small muted">
+            Built from “{f.name}” — composition, cost and IFRA contributions follow that formula’s current version.
+          </div>
+          <div className="accord-parts">
+            {parts.slice(0, 12).map((p) => (
+              <div key={p.material.id} className="stat-row">
+                <span className="k">{p.material.name}</span>
+                <span className="v">{fmtSmart(p.fraction * 100)}%</span>
+              </div>
+            ))}
+            {parts.length > 12 && <div className="faint small">+ {parts.length - 12} more</div>}
+            {(() => {
+              const solvent = 1 - parts.reduce((a, p) => a + p.fraction, 0)
+              return solvent > 0.0005 ? (
+                <div className="stat-row">
+                  <span className="k faint">Solvent from dilutions</span>
+                  <span className="v faint">{fmtSmart(solvent * 100)}%</span>
+                </div>
+              ) : null
+            })()}
+          </div>
+        </>
+      )}
     </div>
   )
 }

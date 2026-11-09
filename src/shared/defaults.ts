@@ -44,13 +44,14 @@ export const COOL_SWATCHES = [
 
 export const PRODUCT_PRESETS: Record<Exclude<ProductType, 'custom'>, { label: string; concentration: number }> = {
   parfum: { label: 'Extrait / Parfum', concentration: 25 },
-  edp: { label: 'Eau de Parfum', concentration: 18 },
-  edt: { label: 'Eau de Toilette', concentration: 12 },
+  edp: { label: 'Eau de Parfum', concentration: 17 },
+  edt: { label: 'Eau de Toilette', concentration: 10 },
   edc: { label: 'Eau de Cologne', concentration: 5 }
 }
 
 export const DEFAULT_SETTINGS: Settings = {
   dropMassG: 0.02,
+  balanceStep: 0.01,
   productDensity: 0.82,
   ethanolDensity: 0.79,
   alcoholPricePerL: 0,

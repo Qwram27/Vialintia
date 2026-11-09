@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import type { AmountUnit, Formula, FormulaRow, FormulaStatus, Material, ProductType, Settings, TestNote, TestPhase, TestStage } from '@shared/types'
 import { NOTE_LABELS, NOTE_ORDER, PRODUCT_PRESETS } from '@shared/defaults'
-import { currentVersion, familyById, useMaterialMap, useStore, withRows } from '@/store/store'
+import { currentVersion, familyById, useAccordIndex, useMaterialMap, useStore, withRows } from '@/store/store'
 import { confirmDialog, navigate, toast } from '@/store/ui'
-import { computeFormula, fmt, fmtSmart, inkOn, type FormulaCalc } from '@/lib/calc'
+import { computeFormula, fmt, fmtSmart, inkOn, roundToStep, rowIfraEntry, scaleRows, type FormulaCalc } from '@/lib/calc'
 import { formulaToCsv, formulaToPdfHtml } from '@/lib/exports'
 import { uid } from '@/lib/id'
 import { NumberInput } from '@/components/NumberInput'
@@ -16,7 +17,7 @@ import { Stars } from '@/components/Overlays'
 import { Sheet } from '@/components/Sheet'
 import { useIsMobile } from '@/lib/useMobile'
 import {
-  IconAlert, IconAnalyze, IconCheck, IconCopy, IconDownload, IconFile, IconGrip, IconPlus,
+  IconAlert, IconAnalyze, IconCheck, IconScale, IconCopy, IconDownload, IconFile, IconGrip, IconPlus,
   IconRedo, IconSort, IconTrash, IconUndo, IconX
 } from '@/components/Icons'
 
@@ -31,13 +32,14 @@ export function FormulaEditor({ id }: { id: string }) {
   const undo = useStore((s) => s.undo)
   const redo = useStore((s) => s.redo)
   const materials = useMaterialMap()
+  const accords = useAccordIndex()
   const [tab, setTab] = useState<'composition' | 'notes' | 'details'>('composition')
   const mobile = useIsMobile()
 
   const version = formula ? currentVersion(formula) : null
   const calc = useMemo(
-    () => (formula && version ? computeFormula(formula, version.rows, materials, settings) : null),
-    [formula, version, materials, settings]
+    () => (formula && version ? computeFormula(formula, version.rows, materials, settings, accords) : null),
+    [formula, version, materials, settings, accords]
   )
 
   // Undo / redo shortcuts (only when not typing in a field).
@@ -110,7 +112,168 @@ export function FormulaEditor({ id }: { id: string }) {
 
         <Inspector formula={formula} calc={calc} update={update} settings={settings} mobile={mobile} />
       </div>
+      <EditorFoot formula={formula} calc={calc} versionLabel={version.label} settings={settings} update={update} />
     </div>
+  )
+}
+
+// ---------------------------------------------------------------- footer actions
+function EditorFoot({
+  formula, calc, versionLabel, settings, update
+}: {
+  formula: Formula
+  calc: FormulaCalc
+  versionLabel: string
+  settings: Settings
+  update: (fn: (f: Formula) => Formula, history?: boolean) => void
+}) {
+  const all = useStore((s) => s.formulas)
+  const materials = useStore((s) => s.materials)
+  const addMaterial = useStore((s) => s.addMaterial)
+  const [scaling, setScaling] = useState(false)
+  const safeName = formula.name.replace(/[\\/:*?"<>|]+/g, '').trim() || 'formula'
+  const fileBase = `${safeName} - ${versionLabel}`
+  const accord = materials.find((m) => m.accordFormulaId === formula.id)
+
+  const saveAsAccord = () => {
+    // family / note of the accord = where most of its neat mass sits
+    const fam = calc.byFamily[0]?.familyId ?? 'other'
+    const note = (['top', 'heart', 'base'] as const).reduce((a, b) => (calc.byNote[b] > calc.byNote[a] ? b : a), 'heart')
+    addMaterial({
+      name: `${formula.name} (accord)`,
+      family: fam,
+      note,
+      type: 'base',
+      accordFormulaId: formula.id,
+      defaultDilution: 100,
+      description: `Accord built from formula N°${catalogNo(formula, all)} — its composition and IFRA contributions follow that formula's current version.`
+    })
+    toast('Saved to Materials as an accord')
+  }
+
+  return (
+    <div className="editor-foot">
+      <button className="btn" onClick={() => setScaling(true)} disabled={calc.totalGrams <= 0}>
+        <IconScale /> Scale
+      </button>
+      {accord ? (
+        <button className="btn" onClick={() => navigate('/library')} title="This formula is in Materials as an accord">
+          <IconCheck /> Accord in library
+        </button>
+      ) : (
+        <button className="btn" onClick={saveAsAccord} disabled={calc.totalGrams <= 0} title="Use this formula as one ingredient in other formulas">
+          <IconPlus /> Save as accord
+        </button>
+      )}
+      <div className="spacer" />
+      <button className="btn" title="Analyze & compare versions" onClick={() => navigate(`/compare?a=${formula.id}`)}>
+        <IconAnalyze /> Analyze
+      </button>
+      <button
+        className="btn"
+        title="Export CSV"
+        onClick={async () => {
+          const p = await window.vialintia.exportText(formulaToCsv(formula, calc, settings), `${fileBase}.csv`, 'csv')
+          if (p) toast('CSV exported')
+        }}
+      >
+        <IconDownload /> CSV
+      </button>
+      <button
+        className="btn"
+        title="Export PDF formula sheet"
+        onClick={async () => {
+          const p = await window.vialintia.printPdf(formulaToPdfHtml(formula, versionLabel, calc, settings, catalogNo(formula, all)), `${fileBase}.pdf`)
+          if (p) toast('PDF saved')
+        }}
+      >
+        <IconFile /> PDF
+      </button>
+      {scaling && <ScaleDialog formula={formula} calc={calc} settings={settings} update={update} onClose={() => setScaling(false)} />}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------- scale dialog
+function ScaleDialog({
+  formula, calc, settings, update, onClose
+}: {
+  formula: Formula
+  calc: FormulaCalc
+  settings: Settings
+  update: (fn: (f: Formula) => Formula, history?: boolean) => void
+  onClose: () => void
+}) {
+  const [mode, setMode] = useState<'mass' | 'bottles'>('mass')
+  const [mass, setMass] = useState(roundToStep(calc.totalGrams, 1) || 10)
+  const [bottles, setBottles] = useState(formula.batch.bottles || 1)
+  const [ml, setMl] = useState(formula.batch.bottleMl || 50)
+  const [asNew, setAsNew] = useState(true)
+  const step = settings.balanceStep || 0.01
+  const target = mode === 'mass' ? mass : (bottles * ml * settings.productDensity * formula.concentration) / 100
+  const v = currentVersion(formula)
+  const scaled = scaleRows(v.rows, formula.unit, settings, target)
+  const total = scaled.reduce((a, r) => a + r.amount, 0)
+
+  const apply = () => {
+    update((f) => {
+      const cur = currentVersion(f)
+      const rows = scaleRows(cur.rows, f.unit, settings, target)
+      const batch = mode === 'bottles' ? { ...f.batch, mode: 'bottles' as const, bottles, bottleMl: ml } : { ...f.batch, mode: 'mass' as const, massG: target }
+      if (!asNew) return { ...f, unit: 'g', batch, versions: f.versions.map((x) => (x.id === cur.id ? { ...x, rows } : x)) }
+      const nums = f.versions.map((x) => Number(/(\d+)\s*$/.exec(x.label)?.[1] ?? 0))
+      const nv = { id: uid(), label: `V${Math.max(f.versions.length, ...nums) + 1}`, createdAt: new Date().toISOString(), comment: `Scaled from ${cur.label} to ${fmtSmart(target)} g concentrate`, rows: rows.map((r) => ({ ...r, id: uid() })) }
+      return { ...f, unit: 'g', batch, versions: [...f.versions, nv], currentVersionId: nv.id }
+    })
+    toast(asNew ? 'Scaled into a new version' : 'Formula scaled')
+    onClose()
+  }
+
+  return createPortal(
+    <div className="overlay" onMouseDown={onClose}>
+      <div className="modal" onMouseDown={(e) => e.stopPropagation()}>
+        <h3>Scale formula</h3>
+        <p>Recalculate the amounts so the concentrate weighs a target mass. Amounts are converted to grams and rounded to your balance step ({String(step)} g).</p>
+        <Seg block value={mode} onChange={setMode} options={[{ value: 'mass', label: 'Concentrate mass' }, { value: 'bottles', label: 'Bottles' }]} />
+        <div className="grid-2 mt">
+          {mode === 'mass' ? (
+            <div className="field" style={{ gridColumn: '1 / -1' }}>
+              <label>Concentrate</label>
+              <div className="suffix">
+                <NumberInput value={mass} min={0} onCommit={(x) => setMass(x ?? 0)} />
+                <span>g</span>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="field">
+                <label>Bottles</label>
+                <NumberInput value={bottles} min={0} onCommit={(x) => setBottles(Math.round(x ?? 0))} />
+              </div>
+              <div className="field">
+                <label>Size</label>
+                <div className="suffix">
+                  <NumberInput value={ml} min={0} onCommit={(x) => setMl(x ?? 0)} />
+                  <span>ml</span>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+        <div className="divider" />
+        <div className="stat-row"><span className="k">Now</span><span className="v">{fmtSmart(calc.totalGrams)} g</span></div>
+        <div className="stat-row"><span className="k">Target concentrate</span><span className="v">{fmtSmart(roundToStep(target, step))} g</span></div>
+        <div className="stat-row"><span className="k">After rounding</span><span className="v">{fmtSmart(roundToStep(total, step))} g · × {fmtSmart(calc.totalGrams > 0 ? target / calc.totalGrams : 0)}</span></div>
+        <label className="row small muted mt" style={{ gap: 8, cursor: 'pointer' }}>
+          <input type="checkbox" checked={asNew} onChange={(e) => setAsNew(e.target.checked)} /> Save as a new version (keeps the original)
+        </label>
+        <div className="modal-actions mt">
+          <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
+          <button className="btn btn-primary" disabled={!(target > 0)} onClick={apply}>Scale</button>
+        </div>
+      </div>
+    </div>,
+    document.body
   )
 }
 
@@ -136,8 +299,6 @@ function Header({
   const all = useStore((s) => s.formulas)
   useEffect(() => setName(formula.name), [formula.name])
 
-  const safeName = formula.name.replace(/[\\/:*?"<>|]+/g, '').trim() || 'formula'
-  const fileBase = `${safeName} - ${versionLabel}`
 
   const addTag = () => {
     const t = tagText.trim()
@@ -191,28 +352,8 @@ function Header({
         <button className="btn btn-ghost btn-icon" title="Redo (Ctrl+Y)" disabled={!canRedo} onClick={onRedo}>
           <IconRedo />
         </button>
-        <button className="btn" title="Analyze & compare versions" onClick={() => navigate(`/compare?a=${formula.id}`)}>
-          <IconAnalyze /> Analyze
-        </button>
-        <button
-          className="btn"
-          title="Export CSV"
-          onClick={async () => {
-            const p = await window.vialintia.exportText(formulaToCsv(formula, calc, settings), `${fileBase}.csv`, 'csv')
-            if (p) toast('CSV exported')
-          }}
-        >
-          <IconDownload /> CSV
-        </button>
-        <button
-          className="btn"
-          title="Export PDF formula sheet"
-          onClick={async () => {
-            const p = await window.vialintia.printPdf(formulaToPdfHtml(formula, versionLabel, calc, settings, catalogNo(formula, all)), `${fileBase}.pdf`)
-            if (p) toast('PDF saved')
-          }}
-        >
-          <IconFile /> PDF
+        <button className="btn btn-primary" title="Weigh this formula step by step" onClick={() => navigate(`/formula/${formula.id}/assemble`)}>
+          <IconScale /> Assemble fragrance
         </button>
         <button
           className="btn btn-ghost btn-icon"
@@ -350,6 +491,7 @@ function Composition({
   update: (fn: (f: Formula) => Formula, history?: boolean) => void
   settings: Settings
 }) {
+  const accords = useAccordIndex()
   const [adding, setAdding] = useState(false)
   const [focusRow, setFocusRow] = useState<string | null>(null)
   const [dragId, setDragId] = useState<string | null>(null)
@@ -524,7 +666,7 @@ function Composition({
                   <td title={`Neat in concentrate: ${fmtSmart(r.neatPct)}%${r.cost ? ` · cost ${settings.currency}${fmt(r.cost, 2)}` : ''}`}>{fmt(r.weighedPct, 2)}</td>
                   <td>{fmtSmart(r.productPct)}</td>
                   <td>
-                    <IfraBadge entry={m ? calc.ifra.byMaterial.get(m.id) : undefined} />
+                    <IfraBadge entry={rowIfraEntry(calc.ifra, m, accords)} />
                   </td>
                   {showBatch && <td className="muted">{fmtSmart(r.batchGrams)}</td>}
                   <td>
@@ -598,6 +740,7 @@ function MobileComposition({
   update: (fn: (f: Formula) => Formula, history?: boolean) => void
   settings: Settings
 }) {
+  const accords = useAccordIndex()
   const [adding, setAdding] = useState(false)
   const [editId, setEditId] = useState<string | null>(null)
   const showBatch = calc.batch.concentrateG > 0
@@ -649,7 +792,7 @@ function MobileComposition({
       <div className="m-rows">
         {calc.rows.map((r, idx) => {
           const m = r.material
-          const entry = m ? calc.ifra.byMaterial.get(m.id) : undefined
+          const entry = rowIfraEntry(calc.ifra, m, accords)
           return (
             <button key={r.row.id} className={`m-row${entry?.status === 'over' ? ' over' : ''}`} onClick={() => setEditId(r.row.id)}>
               <span className="m-row-no">{String(idx + 1).padStart(2, '0')}</span>
@@ -781,7 +924,7 @@ function MobileComposition({
             <div>
               <span className="k">IFRA</span>
               <span className="v">
-                <IfraBadge entry={editing.material ? calc.ifra.byMaterial.get(editing.material.id) : undefined} />
+                <IfraBadge entry={rowIfraEntry(calc.ifra, editing.material, accords)} />
               </span>
             </div>
           </div>

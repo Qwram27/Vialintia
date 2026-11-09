@@ -58,6 +58,87 @@ export interface FormulaCalc {
   ifra: IfraResult
 }
 
+// ---------------------------------------------------------------- accords
+/** One neat material inside an accord, as a fraction of the accord as weighed (0..1). */
+export interface AccordPart {
+  material: Material
+  fraction: number
+}
+export interface AccordInfo {
+  formulaId: string
+  parts: AccordPart[] // fully expanded (nested accords resolved)
+  costPerKg: number // per kg of accord as weighed, from component prices
+  missing: boolean // linked formula not found
+}
+export type AccordIndex = Map<string, AccordInfo>
+
+/**
+ * Resolve every accord material (material.accordFormulaId) into its neat constituents, using the
+ * linked formula's current version. Nested accords are expanded; cycles are cut off.
+ */
+export function buildAccordIndex(materials: Material[], formulas: Formula[], settings: Settings): AccordIndex {
+  const byId = new Map(materials.map((m) => [m.id, m]))
+  const fById = new Map(formulas.map((f) => [f.id, f]))
+  const index: AccordIndex = new Map()
+  const resolve = (m: Material, stack: Set<string>): AccordInfo => {
+    const done = index.get(m.id)
+    if (done) return done
+    const f = m.accordFormulaId ? fById.get(m.accordFormulaId) : undefined
+    const v = f && (f.versions.find((x) => x.id === f.currentVersionId) ?? f.versions[f.versions.length - 1])
+    if (!f || !v) return { formulaId: m.accordFormulaId ?? '', parts: [], costPerKg: 0, missing: true }
+    stack.add(m.id)
+    const grams = v.rows.map((r) => rowGrams(r, f.unit, settings))
+    const total = grams.reduce((a, b) => a + b, 0)
+    const parts = new Map<string, AccordPart>()
+    let cost = 0
+    v.rows.forEach((r, i) => {
+      const sub = byId.get(r.materialId)
+      if (!sub || total <= 0) return
+      const frac = ((grams[i] * clampPct(r.dilution)) / 100) / total // neat share of this row
+      if (sub.accordFormulaId && !stack.has(sub.id)) {
+        const inner = resolve(sub, stack)
+        for (const p of inner.parts) {
+          const cur = parts.get(p.material.id)
+          if (cur) cur.fraction += frac * p.fraction
+          else parts.set(p.material.id, { material: p.material, fraction: frac * p.fraction })
+        }
+        cost += frac * (sub.pricePerKg ?? inner.costPerKg)
+      } else if (!sub.accordFormulaId) {
+        const cur = parts.get(sub.id)
+        if (cur) cur.fraction += frac
+        else parts.set(sub.id, { material: sub, fraction: frac })
+        cost += frac * (sub.pricePerKg ?? 0)
+      }
+    })
+    stack.delete(m.id)
+    const info: AccordInfo = { formulaId: f.id, parts: [...parts.values()], costPerKg: cost, missing: false }
+    index.set(m.id, info)
+    return info
+  }
+  for (const m of materials) if (m.accordFormulaId) resolve(m, new Set())
+  return index
+}
+
+// ---------------------------------------------------------------- scaling
+/** Round to the balance resolution (e.g. 0.01 g), avoiding float noise. */
+export function roundToStep(v: number, step: number): number {
+  if (!(step > 0) || !Number.isFinite(v)) return v
+  const decimals = Math.max(0, Math.ceil(-Math.log10(step) - 1e-9))
+  return Number((Math.round(v / step) * step).toFixed(decimals))
+}
+
+/**
+ * Rescale a version's rows so the concentrate weighs `targetG` grams. Amounts are converted to
+ * grams (the result is always in g) and rounded to the balance step.
+ */
+export function scaleRows(rows: FormulaRow[], unit: Formula['unit'], settings: Settings, targetG: number): FormulaRow[] {
+  const grams = rows.map((r) => rowGrams(r, unit, settings))
+  const total = grams.reduce((a, b) => a + b, 0)
+  if (!(total > 0) || !(targetG > 0)) return rows
+  const k = targetG / total
+  return rows.map((r, i) => ({ ...r, amount: roundToStep(grams[i] * k, settings.balanceStep || 0.01) }))
+}
+
 export const DEFAULT_TENACITY: Record<NoteLevel, number> = { top: 2, heart: 24, base: 150 }
 
 export function rowGrams(row: FormulaRow, unit: Formula['unit'], settings: Settings): number {
@@ -88,14 +169,21 @@ export function worstStatus(a: IfraStatus, b: IfraStatus): IfraStatus {
 export function computeIfra(
   rows: RowCalc[],
   concentration: number,
-  settings: Settings
+  settings: Settings,
+  accords?: AccordIndex
 ): IfraResult {
   const agg = new Map<string, { material: Material; neatPct: number }>()
+  const add = (material: Material, neatPct: number) => {
+    const cur = agg.get(material.id)
+    if (cur) cur.neatPct += neatPct
+    else agg.set(material.id, { material, neatPct })
+  }
   for (const r of rows) {
     if (!r.material) continue
-    const cur = agg.get(r.material.id)
-    if (cur) cur.neatPct += r.neatPct
-    else agg.set(r.material.id, { material: r.material, neatPct: r.neatPct })
+    const acc = r.material.accordFormulaId ? accords?.get(r.material.id) : undefined
+    // An accord counts through its constituents (plus its own limit, if one was entered).
+    if (acc) for (const p of acc.parts) add(p.material, r.neatPct * p.fraction)
+    if (!acc || r.material.ifraLimit != null) add(r.material, r.neatPct)
   }
   const entries: IfraEntry[] = []
   let worst: IfraStatus = 'none'
@@ -132,6 +220,20 @@ export function computeIfra(
     maxConcentration,
     limiting
   }
+}
+
+/** IFRA entry to show on a row: the material's own, or for an accord the most critical of its constituents. */
+export function rowIfraEntry(ifra: IfraResult, material: Material | undefined, accords?: AccordIndex): IfraEntry | undefined {
+  if (!material) return undefined
+  const own = ifra.byMaterial.get(material.id)
+  const acc = material.accordFormulaId ? accords?.get(material.id) : undefined
+  if (!acc) return own
+  let worst = own
+  for (const p of acc.parts) {
+    const e = ifra.byMaterial.get(p.material.id)
+    if (e && (!worst || e.ratio > worst.ratio)) worst = e
+  }
+  return worst
 }
 
 export function computeBatch(formula: Formula, totalGrams: number, costPerKg: number, settings: Settings): BatchCalc {
@@ -172,14 +274,16 @@ export function computeFormula(
   formula: Formula,
   rows: FormulaRow[],
   materials: Map<string, Material>,
-  settings: Settings
+  settings: Settings,
+  accords?: AccordIndex
 ): FormulaCalc {
   const conc = clampPct(formula.concentration)
   const base = rows.map((row) => {
     const material = materials.get(row.materialId)
     const grams = rowGrams(row, formula.unit, settings)
     const neatGrams = (grams * clampPct(row.dilution)) / 100
-    const cost = material?.pricePerKg ? (neatGrams * material.pricePerKg) / 1000 : 0
+    const price = material?.pricePerKg ?? (material?.accordFormulaId ? accords?.get(material.id)?.costPerKg : undefined)
+    const cost = price ? (neatGrams * price) / 1000 : 0
     return { row, material, grams, neatGrams, cost }
   })
   const totalGrams = base.reduce((s, r) => s + r.grams, 0)
@@ -223,7 +327,7 @@ export function computeFormula(
     byFamily,
     materialCount: new Set(rows.filter((r) => materials.has(r.materialId)).map((r) => r.materialId)).size,
     batch,
-    ifra: computeIfra(calcRows, conc, settings)
+    ifra: computeIfra(calcRows, conc, settings, accords)
   }
 }
 

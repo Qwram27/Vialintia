@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_SETTINGS } from '@shared/defaults'
 import type { Formula, Material } from '@shared/types'
-import { computeFormula, diffVersions, evolution, ifraStatus, parseNum } from './calc'
+import { buildAccordIndex, computeFormula, diffVersions, evolution, ifraStatus, parseNum, roundToStep, rowIfraEntry, scaleRows } from './calc'
 import { SEED_VERSION, seedMaterials, upgradeSeedLibrary } from '@/data/seedMaterials'
 
 const now = new Date().toISOString()
@@ -246,5 +246,71 @@ describe('starter library', () => {
     expect(out.filter((m) => m.name !== 'My own base' && m.solvent === 'DPG')).toHaveLength(0)
     expect(out.find((m) => m.name === 'My own base')!.solvent).toBe('DPG')
     expect(seeds.every((m) => m.defaultDilution === 100 || m.solvent === 'EtOH')).toBe(true)
+  })
+})
+
+describe('accords', () => {
+  // Accord formula: 1 g citral (IFRA 0.6 %) + 3 g Iso E (no limit), the citral row diluted to 10 %
+  const citral = mat('citral', { ifraLimit: 0.6, pricePerKg: 100 })
+  const iso = mat('iso', { pricePerKg: 40 })
+  const accF = formula({
+    id: 'acc',
+    versions: [{ id: 'av', label: 'V1', createdAt: now, rows: [
+      { id: 'a1', materialId: 'citral', amount: 1, dilution: 10 },
+      { id: 'a2', materialId: 'iso', amount: 3, dilution: 100 }
+    ] }],
+    currentVersionId: 'av'
+  })
+  const accM = mat('accM', { accordFormulaId: 'acc', type: 'base' })
+  const all = [citral, iso, accM]
+
+  it('expands an accord into neat constituents and prices it from them', () => {
+    const idx = buildAccordIndex(all, [accF], settings)
+    const info = idx.get('accM')!
+    const frac = new Map(info.parts.map((p) => [p.material.id, p.fraction]))
+    expect(frac.get('citral')).toBeCloseTo(0.1 / 4) // 0.1 g neat citral in 4 g
+    expect(frac.get('iso')).toBeCloseTo(3 / 4)
+    expect(info.costPerKg).toBeCloseTo((0.1 / 4) * 100 + (3 / 4) * 40)
+  })
+
+  it('counts accord constituents toward IFRA limits, together with direct use', () => {
+    const idx = buildAccordIndex(all, [accF], settings)
+    // main formula: 10 g accord + 0.1 g citral neat, concentration 20 %
+    const f = formula({ concentration: 20 })
+    const rows = [
+      { id: 'r1', materialId: 'accM', amount: 10, dilution: 100 },
+      { id: 'r2', materialId: 'citral', amount: 0.1, dilution: 100 }
+    ]
+    const c = computeFormula(f, rows, new Map(all.map((m) => [m.id, m])), settings, idx)
+    const e = c.ifra.byMaterial.get('citral')!
+    // citral neat in concentrate: (10 * 0.025 + 0.1) / 10.1 * 100 %
+    expect(e.neatPct).toBeCloseTo(((10 * 0.025 + 0.1) / 10.1) * 100)
+    expect(e.productPct).toBeCloseTo((e.neatPct * 20) / 100)
+    expect(rowIfraEntry(c.ifra, accM, idx)).toBe(e)
+  })
+
+  it('survives accords that reference each other', () => {
+    const a = mat('A', { accordFormulaId: 'fa' })
+    const b = mat('B', { accordFormulaId: 'fb' })
+    const fa = formula({ id: 'fa', versions: [{ id: 'va', label: 'V1', createdAt: now, rows: [{ id: 'x', materialId: 'B', amount: 1, dilution: 100 }] }], currentVersionId: 'va' })
+    const fb = formula({ id: 'fb', versions: [{ id: 'vb', label: 'V1', createdAt: now, rows: [{ id: 'y', materialId: 'A', amount: 1, dilution: 100 }] }], currentVersionId: 'vb' })
+    expect(() => buildAccordIndex([a, b], [fa, fb], settings)).not.toThrow()
+  })
+})
+
+describe('scaling', () => {
+  it('rounds to the balance step', () => {
+    expect(roundToStep(1.23456, 0.01)).toBe(1.23)
+    expect(roundToStep(1.23456, 0.001)).toBe(1.235)
+    expect(roundToStep(0.06, 0.1)).toBe(0.1)
+  })
+  it('scales rows to a target concentrate mass and converts drops to grams', () => {
+    const s = { ...settings, dropMassG: 0.02, balanceStep: 0.01 }
+    const rows = [
+      { id: '1', materialId: 'a', amount: 10, dilution: 100 }, // 10 drops = 0.2 g
+      { id: '2', materialId: 'b', amount: 30, dilution: 100 } // 0.6 g
+    ]
+    const out = scaleRows(rows, 'drops', s, 20)
+    expect(out.map((r) => r.amount)).toEqual([5, 15])
   })
 })
