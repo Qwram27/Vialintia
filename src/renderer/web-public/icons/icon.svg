@@ -1,6 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <!-- Vialintia mark: a formula sheet with a V cut into its top edge -->
   <rect width="512" height="512" fill="#000"/>
-  <path d="M150 140 L256 372 L362 140" fill="none" stroke="#ececec" stroke-width="22" stroke-linecap="square" stroke-linejoin="miter"/>
-  <rect x="150" y="410" width="212" height="4" fill="#5c5c5c"/>
-  <text x="362" y="118" font-family="Consolas, 'DejaVu Sans Mono', monospace" font-size="34" fill="#7b7b7b" text-anchor="end" letter-spacing="2">N°</text>
+  <g fill="none" stroke="#ececec" stroke-width="16" stroke-linecap="square" stroke-linejoin="miter">
+    <path d="M152 84 H206 L256 228 L306 84 H360 V428 H152 Z"/>
+  </g>
+  <g fill="none" stroke="#5c5c5c" stroke-width="12" stroke-linecap="square">
+    <path d="M196 300 H316"/><path d="M196 338 H316"/><path d="M196 376 H268"/>
+  </g>
 </svg>
