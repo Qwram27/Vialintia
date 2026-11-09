@@ -54,3 +54,31 @@ export const IconReset = (p: P) => <Base {...p}><path d="M4 12a8 8 0 1 0 2.3-5.7
 export const IconVial = (p: P) => (
   <Base {...p}><path d="M9 3h6M10 3v15a2 2 0 0 0 4 0V3" /><path d="M10 12h4" /></Base>
 )
+
+// ---- navigation icons: square caps / mitred joins (archive, not rounded)
+function NavBase({ size = 18, children, ...rest }: P & { children: React.ReactNode }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="square" strokeLinejoin="miter" {...rest}>
+      {children}
+    </svg>
+  )
+}
+/** Formulas — a formula sheet. */
+export const IconSheet = (p: P) => (
+  <NavBase {...p}><path d="M5.5 3h9l4 4v14h-13z" /><path d="M14.5 3v4h4" /><path d="M8.5 11h7M8.5 14h7M8.5 17h4" /></NavBase>
+)
+/** Materials — a cone of powder. */
+export const IconPowder = (p: P) => (
+  <NavBase {...p}><path d="M3 20h18" /><path d="M4.5 20C7 15 9 9.5 12 9.5S17 15 19.5 20" /><path d="M12 4v.5M9.5 6.5v.5M14.5 6v.5" /></NavBase>
+)
+/** Analyze — a plotted curve on axes. */
+export const IconAnalyze = (p: P) => (
+  <NavBase {...p}><path d="M4 3v17h17" /><path d="M7 15.5l3.5-4.5 3 2.5L19 6" /></NavBase>
+)
+/** Settings — square-toothed gear. */
+export const IconGear = (p: P) => (
+  <NavBase {...p}>
+    <path d="M21.4 10.4 L21.4 13.6 L19.0 13.6 L18.1 15.9 L19.8 17.5 L17.5 19.8 L15.9 18.1 L13.6 19.0 L13.6 21.4 L10.4 21.4 L10.4 19.0 L8.1 18.1 L6.5 19.8 L4.2 17.5 L5.9 15.9 L5.0 13.6 L2.6 13.6 L2.6 10.4 L5.0 10.4 L5.9 8.1 L4.2 6.5 L6.5 4.2 L8.1 5.9 L10.4 5.0 L10.4 2.6 L13.6 2.6 L13.6 5.0 L15.9 5.9 L17.5 4.2 L19.8 6.5 L18.1 8.1 L19.0 10.4Z" />
+    <rect x="9.5" y="9.5" width="5" height="5" />
+  </NavBase>
+)

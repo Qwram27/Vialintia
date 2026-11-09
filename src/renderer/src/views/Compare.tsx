@@ -72,7 +72,7 @@ export function Compare({ a, b }: { a?: string; b?: string }) {
       <div className="page-head">
         <div>
           <div className="page-kicker">Versions · Side by side</div>
-          <h1 className="page-title">Compare</h1>
+          <h1 className="page-title">Analyze</h1>
           <div className="page-sub">Neat material share in the concentrate, side by side · {changes} difference{changes === 1 ? '' : 's'}</div>
         </div>
       </div>

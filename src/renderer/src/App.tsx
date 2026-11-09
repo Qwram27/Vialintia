@@ -9,13 +9,13 @@ import { Compare } from '@/views/Compare'
 import { SettingsView } from '@/views/Settings'
 import { ConfirmHost, ToastHost } from '@/components/Overlays'
 import { useIsMobile } from '@/lib/useMobile'
-import { IconCompare, IconFlask, IconSettings, IconVial } from '@/components/Icons'
+import { IconAnalyze, IconGear, IconPowder, IconSheet } from '@/components/Icons'
 
 const NAV = [
-  { key: 'dashboard', label: 'Formulas', path: '/', Icon: IconFlask },
-  { key: 'library', label: 'Materials', path: '/library', Icon: IconVial },
-  { key: 'compare', label: 'Compare', path: '/compare', Icon: IconCompare },
-  { key: 'settings', label: 'Settings', path: '/settings', Icon: IconSettings }
+  { key: 'dashboard', label: 'Formulas', path: '/', Icon: IconSheet },
+  { key: 'library', label: 'Materials', path: '/library', Icon: IconPowder },
+  { key: 'compare', label: 'Analyze', path: '/compare', Icon: IconAnalyze },
+  { key: 'settings', label: 'Settings', path: '/settings', Icon: IconGear }
 ] as const
 
 export function App() {
@@ -60,9 +60,9 @@ export function App() {
             <div className="brand-rule" />
           </div>
           <nav className="nav">
-            {NAV.map((n, i) => (
+            {NAV.map((n) => (
               <button key={n.key} className={`nav-item${active === n.key ? ' active' : ''}`} onClick={() => navigate(n.path)}>
-                <span className="idx">{String(i + 1).padStart(2, '0')}</span>
+                <n.Icon size={17} className="nav-icon" />
                 {n.label}
               </button>
             ))}
@@ -90,12 +90,14 @@ export function App() {
           )}
           <div className="sidebar-foot">
             <span>Offline</span>
-            <span>v1.4.5</span>
+            <span>v1.4.6</span>
           </div>
         </aside>
       )}
+      {/* Phones: top bar sits outside the scroll container (a sticky bar inside it renders soft on iOS). */}
+      {mobile && <TopBar route={route} scrolled={scrolled} />}
       <main className="main" ref={mainRef} onScroll={(e) => setScrolled(e.currentTarget.scrollTop > 4)}>
-        <TopBar route={route} scrolled={scrolled} />
+        {!mobile && <TopBar route={route} scrolled={scrolled} />}
         {route.name === 'dashboard' && <Dashboard />}
         {route.name === 'formula' && <FormulaEditor key={route.id} id={route.id} />}
         {route.name === 'library' && <Library />}
@@ -104,7 +106,7 @@ export function App() {
       </main>
       {mobile && (
         <nav className="tabbar" aria-label="Sections">
-          {NAV.map((n, i) => (
+          {NAV.map((n) => (
             <button
               key={n.key}
               className={`tab-item${active === n.key ? ' active' : ''}`}
@@ -112,9 +114,7 @@ export function App() {
               onClick={() => navigate(n.path)}
             >
               <n.Icon size={20} />
-              <span className="lbl">
-                <span className="idx">{String(i + 1).padStart(2, '0')}</span> {n.label}
-              </span>
+              <span className="lbl">{n.label}</span>
             </button>
           ))}
         </nav>
@@ -141,7 +141,7 @@ function TopBar({ route, scrolled }: { route: Route; scrolled: boolean }) {
         {formula ? (
           <>
             <button onClick={() => navigate('/')}>
-              {String(idx + 1).padStart(2, '0')} {section.label}
+              {section.label}
             </button>
             <span className="sep">/</span>
             <span className="cur">
@@ -150,7 +150,7 @@ function TopBar({ route, scrolled }: { route: Route; scrolled: boolean }) {
           </>
         ) : (
           <span className="cur">
-            {String(idx + 1).padStart(2, '0')} {section.label}
+            {section.label}
           </span>
         )}
       </div>

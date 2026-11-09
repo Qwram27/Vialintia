@@ -16,7 +16,7 @@ import { Stars } from '@/components/Overlays'
 import { Sheet } from '@/components/Sheet'
 import { useIsMobile } from '@/lib/useMobile'
 import {
-  IconAlert, IconCheck, IconCompare, IconCopy, IconDownload, IconFile, IconGrip, IconPlus,
+  IconAlert, IconAnalyze, IconCheck, IconCopy, IconDownload, IconFile, IconGrip, IconPlus,
   IconRedo, IconSort, IconTrash, IconUndo, IconX
 } from '@/components/Icons'
 
@@ -191,8 +191,8 @@ function Header({
         <button className="btn btn-ghost btn-icon" title="Redo (Ctrl+Y)" disabled={!canRedo} onClick={onRedo}>
           <IconRedo />
         </button>
-        <button className="btn" title="Compare versions" onClick={() => navigate(`/compare?a=${formula.id}`)}>
-          <IconCompare /> Compare
+        <button className="btn" title="Analyze & compare versions" onClick={() => navigate(`/compare?a=${formula.id}`)}>
+          <IconAnalyze /> Analyze
         </button>
         <button
           className="btn"
