@@ -17,6 +17,30 @@ export function SettingsView() {
   const formulas = useStore((s) => s.formulas)
   const updateSettings = useStore((s) => s.updateSettings)
   const replaceAll = useStore((s) => s.replaceAll)
+  const resetAll = useStore((s) => s.resetAll)
+
+  /** Restore a library export, a settings export or an old full backup — only what the file contains is replaced. */
+  async function restoreFromFile() {
+    const text = await window.vialintia.importJson()
+    if (!text) return
+    let data: Partial<AppData> & { seedVersion?: number; kind?: string }
+    try {
+      data = JSON.parse(text)
+    } catch {
+      return toast('That file is not a Vialintia export')
+    }
+    const hasLib = Array.isArray(data.materials) || Array.isArray(data.formulas)
+    const hasSettings = !!data.settings && typeof data.settings === 'object'
+    if (!hasLib && !hasSettings) return toast('That file is not a Vialintia export')
+    const parts = [
+      hasLib ? `${data.formulas?.length ?? 0} formulas and ${data.materials?.length ?? 0} materials` : null,
+      hasSettings ? 'settings' : null
+    ].filter(Boolean)
+    const ok = await confirmDialog('Restore from file?', `This replaces your current ${parts.join(' and ')} with the ones in the file.`, 'Restore')
+    if (!ok) return
+    replaceAll(data)
+    toast(hasLib && hasSettings ? 'Backup restored' : hasLib ? 'Formulas & materials restored' : 'Settings restored')
+  }
   const updateMaterial = useStore((s) => s.updateMaterial)
   const [newFamily, setNewFamily] = useState('')
   const [solventText, setSolventText] = useState(settings.solvents.join(', '))
@@ -210,7 +234,7 @@ export function SettingsView() {
             <h3 className="card-title">Data & backups</h3>
             <p className="muted small" style={{ marginTop: 0 }}>
               {isWeb
-                ? 'Everything is stored on this device, in the browser — no account, works offline. Use Export backup / Restore backup to move data between your computer and phone.'
+                ? 'Everything is stored on this device, in the browser — no account, works offline. Use Export / Restore from file to move data between your computer and phone.'
                 : 'Everything is stored locally on this computer — no account, no internet. A snapshot is taken automatically every time the app starts (last 10 kept).'}
             </p>
             <div className="small faint mb" style={{ wordBreak: 'break-all' }}>
@@ -220,43 +244,55 @@ export function SettingsView() {
               <button
                 className="btn"
                 onClick={async () => {
-                  const data: AppData = { materials, formulas, settings }
                   const stamp = new Date().toISOString().slice(0, 10)
-                  const p = await window.vialintia.exportJson(JSON.stringify({ app: 'Vialintia', version: 1, ...data }, null, 2), `vialintia-backup-${stamp}.json`)
-                  if (p) toast('Backup saved')
+                  const file = { app: 'Vialintia', kind: 'library', version: 1, seedVersion: settings.seedVersion, materials, formulas }
+                  const p = await window.vialintia.exportJson(JSON.stringify(file, null, 2), `vialintia-library-${stamp}.json`)
+                  if (p) toast('Formulas & materials exported')
                 }}
               >
-                <IconDownload /> Export backup
+                <IconDownload /> Export formulas & materials
               </button>
               <button
                 className="btn"
                 onClick={async () => {
-                  const text = await window.vialintia.importJson()
-                  if (!text) return
-                  try {
-                    const data = JSON.parse(text) as Partial<AppData>
-                    if (!Array.isArray(data.materials) && !Array.isArray(data.formulas)) throw new Error('not a backup')
-                    const ok = await confirmDialog(
-                      'Restore backup?',
-                      `This replaces your current library and formulas with ${data.formulas?.length ?? 0} formulas and ${data.materials?.length ?? 0} materials from the file.`,
-                      'Restore'
-                    )
-                    if (ok) {
-                      replaceAll(data)
-                      toast('Backup restored')
-                    }
-                  } catch {
-                    toast('That file is not a Vialintia backup')
-                  }
+                  const stamp = new Date().toISOString().slice(0, 10)
+                  const file = { app: 'Vialintia', kind: 'settings', version: 1, settings }
+                  const p = await window.vialintia.exportJson(JSON.stringify(file, null, 2), `vialintia-settings-${stamp}.json`)
+                  if (p) toast('Settings exported')
                 }}
               >
-                <IconUpload /> Restore backup
+                <IconDownload /> Export settings
+              </button>
+              <button className="btn" onClick={restoreFromFile}>
+                <IconUpload /> Restore from file
               </button>
               {!isWeb && (
                 <button className="btn btn-ghost" onClick={() => window.vialintia.openDataFolder()}>
                   <IconFolder /> Open data folder
                 </button>
               )}
+            </div>
+            <div className="divider" />
+            <div className="row" style={{ flexWrap: 'wrap', gap: 10 }}>
+              <span className="faint small" style={{ flex: '1 1 220px' }}>
+                Reset clears all formulas and settings and reloads the starter library. Export first if you want to keep anything.
+              </span>
+              <button
+                className="btn btn-danger"
+                onClick={async () => {
+                  const ok = await confirmDialog(
+                    'Reset the app?',
+                    `All ${formulas.length} formulas, your edits to ${materials.length} materials and all settings will be deleted and the starter library reloaded. This cannot be undone.`,
+                    'Reset'
+                  )
+                  if (ok) {
+                    resetAll()
+                    toast('App reset')
+                  }
+                }}
+              >
+                <IconReset /> Reset app
+              </button>
             </div>
           </div>
 

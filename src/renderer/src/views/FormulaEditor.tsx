@@ -368,7 +368,7 @@ function Composition({
   const patchRow = (rid: string, patch: Partial<FormulaRow>) => setRows(rows.map((r) => (r.id === rid ? { ...r, ...patch } : r)))
 
   const addMaterial = (m: Material) => {
-    const row: FormulaRow = { id: uid(), materialId: m.id, amount: 0, dilution: m.defaultDilution ?? 100, solvent: m.solvent ?? (m.defaultDilution < 100 ? 'DPG' : undefined) }
+    const row: FormulaRow = { id: uid(), materialId: m.id, amount: 0, dilution: m.defaultDilution ?? 100, solvent: m.solvent ?? (m.defaultDilution < 100 ? 'EtOH' : undefined) }
     setRows([...rows, row])
     setFocusRow(row.id)
   }
@@ -606,7 +606,7 @@ function MobileComposition({
   const patchRow = (rid: string, patch: Partial<FormulaRow>) => setRows(rows.map((r) => (r.id === rid ? { ...r, ...patch } : r)))
 
   const addMaterial = (m: Material) => {
-    const row: FormulaRow = { id: uid(), materialId: m.id, amount: 0, dilution: m.defaultDilution ?? 100, solvent: m.solvent ?? (m.defaultDilution < 100 ? 'DPG' : undefined) }
+    const row: FormulaRow = { id: uid(), materialId: m.id, amount: 0, dilution: m.defaultDilution ?? 100, solvent: m.solvent ?? (m.defaultDilution < 100 ? 'EtOH' : undefined) }
     setRows([...rows, row])
     setEditId(row.id)
   }
