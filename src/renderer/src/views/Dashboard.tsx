@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react'
-import type { FormulaStatus } from '@shared/types'
+import type { Formula, FormulaStatus } from '@shared/types'
 import { csvToFormula } from '@/lib/importFormula'
 import { currentVersion, useAccordIndex, useMaterialMap, useStore } from '@/store/store'
-import { confirmDialog, navigate, toast } from '@/store/ui'
+import { confirmDialog, navigate, openContextMenu, toast } from '@/store/ui'
 import { computeFormula } from '@/lib/calc'
 import { catalogNo, seasonCode, shortDate } from '@/lib/archive'
 import { NoteBar } from '@/components/Charts'
@@ -62,6 +62,32 @@ export function Dashboard() {
         return { f, v, no: catalogNo(f, formulas), calc: computeFormula(f, v.rows, materials, settings, accords) }
       })
   }, [formulas, materials, settings, accords, q, status, sort])
+
+  const updateFormula = useStore((s) => s.updateFormula)
+  const remove = async (f: Formula) => {
+    if (await confirmDialog('Delete formula', `“${f.name}” and all its versions and notes will be removed.`)) {
+      deleteFormula(f.id)
+      toast('Formula deleted')
+    }
+  }
+  const cardMenu = (e: React.MouseEvent, f: Formula) =>
+    openContextMenu(e, [
+      { label: 'Open', onSelect: () => navigate(`/formula/${f.id}`) },
+      { label: 'Assemble fragrance', onSelect: () => navigate(`/formula/${f.id}/assemble`) },
+      {
+        label: 'Duplicate',
+        onSelect: () => {
+          duplicateFormula(f.id)
+          toast(`Duplicated ${f.name}`)
+        }
+      },
+      {
+        label: f.status === 'final' ? 'Mark as testing' : 'Mark as final',
+        sep: true,
+        onSelect: () => updateFormula(f.id, (x) => ({ ...x, status: x.status === 'final' ? 'testing' : 'final' }))
+      },
+      { label: 'Delete', danger: true, sep: true, onSelect: () => remove(f) }
+    ])
 
   const counts = useMemo(() => {
     const c = { all: formulas.length, testing: 0, final: 0 }
@@ -188,7 +214,7 @@ export function Dashboard() {
                 </thead>
                 <tbody>
                   {list.map(({ f, v, no, calc }, i) => (
-                    <tr key={f.id} style={{ '--i': i } as React.CSSProperties} onClick={() => navigate(`/formula/${f.id}`)}>
+                    <tr key={f.id} style={{ '--i': i } as React.CSSProperties} onClick={() => navigate(`/formula/${f.id}`)} onContextMenu={(e) => cardMenu(e, f)}>
                       <td className="l idx-no">{no}</td>
                       <td className="l idx-name">{f.name}</td>
                       <td className="l">
@@ -220,7 +246,7 @@ export function Dashboard() {
           ) : (
           <div className="formula-grid">
             {list.map(({ f, v, no, calc }, i) => (
-              <div key={f.id} className="card fcard" style={{ '--i': i } as React.CSSProperties} onClick={() => navigate(`/formula/${f.id}`)}>
+              <div key={f.id} className="card fcard" style={{ '--i': i } as React.CSSProperties} onClick={() => navigate(`/formula/${f.id}`)} onContextMenu={(e) => cardMenu(e, f)}>
                 <div className="fcard-actions" onClick={(e) => e.stopPropagation()}>
                   <button
                     className="btn btn-ghost btn-icon"
@@ -235,12 +261,7 @@ export function Dashboard() {
                   <button
                     className="btn btn-ghost btn-icon btn-danger"
                     title="Delete"
-                    onClick={async () => {
-                      if (await confirmDialog('Delete formula', `“${f.name}” and all its versions and notes will be removed.`)) {
-                        deleteFormula(f.id)
-                        toast('Formula deleted')
-                      }
-                    }}
+                    onClick={() => remove(f)}
                   >
                     <IconTrash size={14} />
                   </button>

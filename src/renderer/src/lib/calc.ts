@@ -431,3 +431,132 @@ export function inkOn(hex: string): string {
   const L = 0.2126 * lin((n >> 16) & 255) + 0.7152 * lin((n >> 8) & 255) + 0.0722 * lin(n & 255)
   return L > 0.18 ? '#0d0f0e' : '#eef3ef'
 }
+
+// ---------------------------------------------------------------- accord reduction
+/**
+ * Replace an accord row with the accord formula's own rows (one level; nested accords stay as
+ * accord rows and can be reduced again). Amounts are real: each constituent gets its share of the
+ * weighed accord mass, and the accord row's dilution is folded into each constituent's dilution,
+ * so total weighed mass and every neat amount stay exactly the same. The constituents stay in their
+ * own block (not merged into rows elsewhere in the formula).
+ * The new block gets a divider labelled with the accord (the row's own divider label wins), and
+ * the row after the block gets a plain divider so the block stays separate.
+ */
+export function reduceAccordRow(
+  rows: FormulaRow[],
+  rowId: string,
+  unit: Formula['unit'],
+  accord: Formula,
+  settings: Settings,
+  newId: () => string,
+  label = accord.name
+): FormulaRow[] | null {
+  const idx = rows.findIndex((r) => r.id === rowId)
+  const row = rows[idx]
+  const v = accord.versions.find((x) => x.id === accord.currentVersionId) ?? accord.versions[accord.versions.length - 1]
+  if (!row || !v?.rows.length) return null
+  const grams = v.rows.map((r) => rowGrams(r, accord.unit, settings))
+  const total = grams.reduce((a, b) => a + b, 0)
+  if (!(total > 0)) return null
+  const weighedG = rowGrams(row, unit, settings)
+  const accordDil = clampPct(row.dilution) / 100
+  const toUnit = (g: number) => (unit === 'drops' && settings.dropMassG > 0 ? g / settings.dropMassG : g)
+  const round = (x: number) => Number(x.toFixed(4))
+  const key = (r: FormulaRow) => `${r.materialId}|${round(r.dilution)}|${r.dilution < 100 ? r.solvent ?? '' : ''}`
+
+  const rest = rows.filter((r) => r.id !== rowId).map((r) => ({ ...r }))
+  const touched = new Set<FormulaRow>()
+  const inserted: FormulaRow[] = []
+  v.rows.forEach((r, i) => {
+    if (!(grams[i] > 0)) return
+    const dilution = round(clampPct(r.dilution) * accordDil)
+    const next: FormulaRow = {
+      id: newId(),
+      materialId: r.materialId,
+      amount: toUnit(weighedG * (grams[i] / total)),
+      dilution: dilution > 0 ? dilution : 100,
+      solvent: dilution < 100 ? (r.dilution < 100 ? r.solvent : undefined) ?? row.solvent ?? 'EtOH' : undefined
+    }
+    const same = inserted.find((x) => key(x) === key(next))
+    const target = same ?? next
+    if (same) same.amount += next.amount
+    else inserted.push(next)
+    touched.add(target)
+  })
+  touched.forEach((r) => (r.amount = round(r.amount)))
+  if (inserted.length) {
+    inserted[0].section = row.section?.trim() ? row.section : label
+    const after = rest[idx]
+    if (after && after.section == null) after.section = ''
+  } else if (row.section != null && rest[idx] && rest[idx].section == null) {
+    rest[idx].section = row.section
+  }
+  return [...rest.slice(0, idx), ...inserted, ...rest.slice(idx)]
+}
+
+// ---------------------------------------------------------------- dividers
+/** Remove a row; its divider moves to the next row (unless that one already starts a section). */
+export function removeRow(rows: FormulaRow[], rowId: string): FormulaRow[] {
+  const i = rows.findIndex((r) => r.id === rowId)
+  if (i < 0) return rows
+  const gone = rows[i]
+  const next = rows.filter((r) => r.id !== rowId)
+  if (gone.section != null && next[i] && next[i].section == null) next[i] = { ...next[i], section: gone.section }
+  return next
+}
+
+/** Split rows into blocks at dividers (the first block may have no divider). */
+export function sectionBlocks<T extends { section?: string }>(rows: T[]): T[][] {
+  const out: T[][] = []
+  rows.forEach((r, i) => {
+    if (i === 0 || r.section != null) out.push([r])
+    else out[out.length - 1].push(r)
+  })
+  return out
+}
+
+/** Where a dragged row lands: above / below a row, or first in the section that starts at a row. */
+export type RowDrop = { rowId: string; where: 'above' | 'below' } | { sectionOf: string }
+
+type Item = { h: string } | { r: FormulaRow }
+
+/**
+ * Move a row while dividers stay where they are: the row leaves its section and joins the one it
+ * is dropped into. A divider left with no rows disappears.
+ */
+export function moveRow(rows: FormulaRow[], rowId: string, to: RowDrop): FormulaRow[] {
+  const items: Item[] = []
+  for (const r of rows) {
+    if (r.section != null) items.push({ h: r.section })
+    items.push({ r: { ...r, section: undefined } })
+  }
+  const isRow = (it: Item | undefined, id?: string): it is { r: FormulaRow } => !!it && 'r' in it && (id == null || it.r.id === id)
+  const from = items.findIndex((it) => isRow(it, rowId))
+  if (from < 0) return rows
+  const targetId = 'sectionOf' in to ? to.sectionOf : to.rowId
+  if (targetId === rowId) return rows
+  const [moved] = items.splice(from, 1)
+  const t = items.findIndex((it) => isRow(it, targetId))
+  if (t < 0) return rows
+  items.splice('sectionOf' in to || to.where === 'above' ? t : t + 1, 0, moved)
+  const out: FormulaRow[] = []
+  let pending: string | undefined
+  for (const it of items) {
+    if ('h' in it) pending = it.h
+    else {
+      out.push(pending != null ? { ...it.r, section: pending } : it.r)
+      pending = undefined
+    }
+  }
+  return out
+}
+
+/** Phone up / down: one step, crossing a divider into the neighbouring section. */
+export function stepRow(rows: FormulaRow[], rowId: string, dir: -1 | 1): FormulaRow[] {
+  const i = rows.findIndex((r) => r.id === rowId)
+  const row = rows[i]
+  const other = rows[i + dir]
+  if (!row || !other) return rows
+  if (dir === -1) return moveRow(rows, rowId, { rowId: other.id, where: row.section != null ? 'below' : 'above' })
+  return moveRow(rows, rowId, other.section != null ? { sectionOf: other.id } : { rowId: other.id, where: 'below' })
+}

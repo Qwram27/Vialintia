@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { AmountUnit, Formula, FormulaRow, FormulaStatus, Material, ProductType, Settings, TestNote, TestPhase, TestStage } from '@shared/types'
 import { NOTE_LABELS, NOTE_ORDER, PRODUCT_PRESETS } from '@shared/defaults'
 import { currentVersion, familyById, useAccordIndex, useMaterialMap, useStore, withRows } from '@/store/store'
-import { confirmDialog, navigate, toast, withProgress } from '@/store/ui'
+import { confirmDialog, navigate, openContextMenu, toast, withProgress } from '@/store/ui'
 import { isWeb } from '@/platform'
-import { computeFormula, fmt, fmtSmart, inkOn, roundToStep, rowIfraEntry, scaleRows, type FormulaCalc } from '@/lib/calc'
+import { computeFormula, fmt, fmtSmart, inkOn, moveRow, reduceAccordRow, removeRow, roundToStep, sectionBlocks, stepRow, type RowDrop, rowIfraEntry, scaleRows, type FormulaCalc } from '@/lib/calc'
 import { formulaToCsv, formulaToPdfHtml } from '@/lib/exports'
 import { uid } from '@/lib/id'
 import { NumberInput } from '@/components/NumberInput'
@@ -23,7 +23,8 @@ import {
 } from '@/components/Icons'
 
 const STATUS_LABEL: Record<FormulaStatus, string> = { testing: 'Testing', final: 'Final' }
-const UNIT_LABEL: Record<AmountUnit, string> = { g: 'g', drops: 'drops', parts: 'parts' }
+const UNIT_LABEL: Record<AmountUnit, string> = { g: 'g', drops: 'drops' }
+const UNIT_NAME: Record<AmountUnit, string> = { g: 'Weight', drops: 'Drops' }
 
 export function FormulaEditor({ id }: { id: string }) {
   const formula = useStore((s) => s.formulas.find((f) => f.id === id))
@@ -495,6 +496,106 @@ function Versions({ formula, update }: { formula: Formula; update: (fn: (f: Form
 }
 
 // ---------------------------------------------------------------- composition table
+/** Weighed % per divider (keyed by the row that starts it). */
+function sectionTotals(calc: FormulaCalc) {
+  const out = new Map<string, { weighed: number; count: number }>()
+  for (const block of sectionBlocks(calc.rows.map((r) => ({ ...r, section: r.row.section })))) {
+    out.set(block[0].row.id, { weighed: block.reduce((a, r) => a + r.weighedPct, 0), count: block.length })
+  }
+  return out
+}
+
+/** Divider label: edited in place, committed on blur / Enter. */
+function SectionHead({
+  label, totals, onRename, onRemove, onMenu
+}: {
+  label: string
+  totals?: { weighed: number; count: number }
+  onRename: (v: string) => void
+  onRemove: () => void
+  onMenu?: (e: React.MouseEvent) => void
+}) {
+  const [text, setText] = useState(label)
+  useEffect(() => setText(label), [label])
+  return (
+    <div className="sec-head" onContextMenu={onMenu}>
+      <input
+        className="sec-input"
+        value={text}
+        placeholder="Section"
+        style={{ width: `calc(${Math.max(7, text.length + 1)}ch + ${Math.max(7, text.length + 1) * 0.24}em)` }}
+        onChange={(e) => setText(e.target.value)}
+        onBlur={() => text.trim() !== label && onRename(text.trim())}
+        onKeyDown={(e) => {
+          if (e.key === 'Escape') setText(label)
+          if (e.key === 'Enter' || e.key === 'Escape') (e.target as HTMLInputElement).blur()
+        }}
+      />
+      <span className="spacer" />
+      {totals && (
+        <small>
+          {fmt(totals.weighed, 2)}% · {totals.count} mat.
+        </small>
+      )}
+      <button className="btn btn-ghost btn-icon row-del" title="Remove divider" onClick={onRemove}>
+        <IconX size={14} />
+      </button>
+    </div>
+  )
+}
+
+/** Row actions shared by the desktop table (right-click menu) and the phone row sheet. */
+function useRowActions(formula: Formula, rows: FormulaRow[], setRows: (rows: FormulaRow[]) => void, settings: Settings) {
+  const formulas = useStore((s) => s.formulas)
+  const materials = useMaterialMap()
+  const accordOf = (r: FormulaRow) => {
+    const fid = materials.get(r.materialId)?.accordFormulaId
+    return fid ? formulas.find((f) => f.id === fid) ?? null : null
+  }
+  const reduce = async (r: FormulaRow) => {
+    const accord = accordOf(r)
+    const m = materials.get(r.materialId)
+    if (!accord || !m) return
+    const next = reduceAccordRow(rows, r.id, formula.unit, accord, settings, uid, m.name)
+    if (!next) return toast(`${m.name} has no materials to reduce to`)
+    const added = next.length - rows.length + 1
+    setRows(next)
+    toast(`${m.name} reduced to its materials${added > 0 ? ` · ${added} row${added > 1 ? 's' : ''}` : ''}`)
+  }
+  /** Apply a reorder; say so when a divider was left empty and dropped (Ctrl+Z brings it back). */
+  const reorder = (next: FormulaRow[]) => {
+    const labels = (rs: FormulaRow[]) => rs.filter((r) => r.section != null).map((r) => r.section as string)
+    const before = labels(rows)
+    const after = labels(next)
+    if (after.length < before.length) {
+      const lost = before.find((l) => !after.includes(l))
+      toast(lost ? `Section “${lost}” removed — it had no materials left` : 'Empty section removed')
+    }
+    setRows(next)
+  }
+  const move = (rid: string, dir: -1 | 1) => reorder(stepRow(rows, rid, dir))
+  const duplicate = (r: FormulaRow) => {
+    const i = rows.findIndex((x) => x.id === r.id)
+    setRows([...rows.slice(0, i + 1), { ...r, id: uid() }, ...rows.slice(i + 1)])
+  }
+  const remove = (rid: string) => setRows(removeRow(rows, rid))
+  const setSection = (rid: string, section: string | undefined) =>
+    setRows(rows.map((r) => (r.id === rid ? { ...r, section } : r)))
+  /** Sort by note within each divider block; the divider stays at the top of its block. */
+  const sortByNote = (rank: (r: FormulaRow) => number, grams: Map<string, number>) =>
+    setRows(
+      sectionBlocks(rows).flatMap((block) => {
+        const label = block[0].section
+        const sorted = block
+          .map((r): FormulaRow => ({ ...r, section: undefined }))
+          .sort((a, b) => rank(a) - rank(b) || (grams.get(b.id) ?? 0) - (grams.get(a.id) ?? 0))
+        if (label != null) sorted[0] = { ...sorted[0], section: label }
+        return sorted
+      })
+    )
+  return { accordOf, reduce, move, reorder, duplicate, remove, setSection, sortByNote }
+}
+
 function Composition({
   formula, rows, calc, setRows, update, settings
 }: {
@@ -509,10 +610,26 @@ function Composition({
   const [adding, setAdding] = useState(false)
   const [focusRow, setFocusRow] = useState<string | null>(null)
   const [dragId, setDragId] = useState<string | null>(null)
-  const [overId, setOverId] = useState<string | null>(null)
+  const [over, setOver] = useState<RowDrop | null>(null)
   const [armed, setArmed] = useState<string | null>(null)
   const amountRefs = useRef(new Map<string, HTMLInputElement>())
   const showBatch = calc.batch.concentrateG > 0
+  const act = useRowActions(formula, rows, setRows, settings)
+
+  const rowMenu = (e: React.MouseEvent, row: FormulaRow, idx: number) => {
+    const accord = act.accordOf(row)
+    openContextMenu(e, [
+      accord && { label: 'Reduce accord', onSelect: () => act.reduce(row) },
+      accord && { label: 'Open accord formula', onSelect: () => navigate(`/formula/${accord.id}`) },
+      row.section == null
+        ? { label: 'Add divider above', onSelect: () => act.setSection(row.id, ''), sep: !!accord }
+        : { label: 'Remove divider above', onSelect: () => act.setSection(row.id, undefined), sep: !!accord },
+      { label: 'Duplicate row', onSelect: () => act.duplicate(row) },
+      { label: 'Move up', disabled: idx === 0, onSelect: () => act.move(row.id, -1) },
+      { label: 'Move down', disabled: idx === rows.length - 1, onSelect: () => act.move(row.id, 1) },
+      { label: 'Remove', danger: true, sep: true, onSelect: () => act.remove(row.id) }
+    ])
+  }
 
   useEffect(() => {
     if (focusRow) {
@@ -534,24 +651,34 @@ function Composition({
       const m = calc.rows.find((c) => c.row.id === r.id)?.material
       return m ? NOTE_ORDER.indexOf(m.note) : 3
     }
-    const grams = new Map(calc.rows.map((c) => [c.row.id, c.neatGrams]))
-    setRows([...rows].sort((a, b) => rank(a) - rank(b) || (grams.get(b.id) ?? 0) - (grams.get(a.id) ?? 0)))
+    act.sortByNote(rank, new Map(calc.rows.map((c) => [c.row.id, c.neatGrams])))
   }
+  const totals = sectionTotals(calc)
 
   const onEnter = (idx: number) => {
     if (idx < rows.length - 1) setFocusRow(rows[idx + 1].id)
     else setAdding(true)
   }
 
-  const drop = (targetId: string) => {
-    if (!dragId || dragId === targetId) return
-    const from = rows.findIndex((r) => r.id === dragId)
-    const to = rows.findIndex((r) => r.id === targetId)
-    const next = [...rows]
-    const [moved] = next.splice(from, 1)
-    next.splice(to > from ? to - 1 : to, 0, moved)
-    setRows(next)
+  const drop = () => {
+    if (dragId && over) act.reorder(moveRow(rows, dragId, over))
+    setOver(null)
   }
+  const endDrag = () => {
+    setDragId(null)
+    setOver(null)
+    setArmed(null)
+  }
+  /** Upper half of a row = drop above it, lower half = below it. */
+  const overRow = (e: React.DragEvent, rowId: string) => {
+    if (!dragId) return
+    e.preventDefault()
+    const box = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    const where = e.clientY < box.top + box.height / 2 ? 'above' : 'below'
+    if (!over || !('rowId' in over) || over.rowId !== rowId || over.where !== where) setOver({ rowId, where })
+  }
+  const dropClass = (rowId: string) =>
+    !dragId || dragId === rowId || !over || !('rowId' in over) || over.rowId !== rowId ? '' : over.where === 'above' ? ' drop-above' : ' drop-below'
 
   return (
     <>
@@ -560,7 +687,7 @@ function Composition({
         <Seg
           value={formula.unit}
           onChange={(u) => update((f) => ({ ...f, unit: u }))}
-          options={(['g', 'drops', 'parts'] as const).map((u) => ({ value: u, label: UNIT_LABEL[u] }))}
+          options={(['g', 'drops'] as const).map((u) => ({ value: u, label: UNIT_NAME[u] }))}
         />
         {formula.unit === 'drops' && <span className="faint small">1 drop = {settings.dropMassG} g</span>}
         <div className="spacer" />
@@ -589,28 +716,47 @@ function Composition({
             {calc.rows.map((r, idx) => {
               const m = r.material
               return (
+                <Fragment key={r.row.id}>
+                {r.row.section != null && (
+                  <tr
+                    className={`sec-row${idx === 0 ? ' first' : ''}${dragId && over && 'sectionOf' in over && over.sectionOf === r.row.id ? ' drop-below' : ''}`}
+                    onDragOver={(e) => {
+                      if (!dragId) return
+                      e.preventDefault()
+                      if (!over || !('sectionOf' in over) || over.sectionOf !== r.row.id) setOver({ sectionOf: r.row.id })
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault()
+                      drop()
+                    }}
+                  >
+                    <td colSpan={showBatch ? 10 : 9} className="l">
+                      <SectionHead
+                        label={r.row.section}
+                        totals={totals.get(r.row.id)}
+                        onRename={(v) => act.setSection(r.row.id, v)}
+                        onRemove={() => act.setSection(r.row.id, undefined)}
+                        onMenu={(e) =>
+                          openContextMenu(e, [{ label: 'Remove divider', danger: true, onSelect: () => act.setSection(r.row.id, undefined) }])
+                        }
+                      />
+                    </td>
+                  </tr>
+                )}
                 <tr
-                  key={r.row.id}
                   draggable={armed === r.row.id}
-                  className={`${dragId === r.row.id ? 'dragging' : ''}${overId === r.row.id && dragId !== r.row.id ? ' drop-above' : ''}`}
+                  className={`${dragId === r.row.id ? 'dragging' : ''}${dropClass(r.row.id)}`}
+                  onContextMenu={(e) => rowMenu(e, r.row, idx)}
                   onDragStart={(e) => {
                     setDragId(r.row.id)
                     e.dataTransfer.effectAllowed = 'move'
                   }}
-                  onDragOver={(e) => {
-                    if (!dragId) return
-                    e.preventDefault()
-                    setOverId(r.row.id)
-                  }}
+                  onDragOver={(e) => overRow(e, r.row.id)}
                   onDrop={(e) => {
                     e.preventDefault()
-                    drop(r.row.id)
+                    drop()
                   }}
-                  onDragEnd={() => {
-                    setDragId(null)
-                    setOverId(null)
-                    setArmed(null)
-                  }}
+                  onDragEnd={endDrag}
                 >
                   <td style={{ width: 30 }}>
                     <span className="rowno">{String(idx + 1).padStart(2, '0')}</span>
@@ -684,11 +830,12 @@ function Composition({
                   </td>
                   {showBatch && <td className="muted">{fmtSmart(r.batchGrams)}</td>}
                   <td>
-                    <button className="btn btn-ghost btn-icon row-del btn-danger" title="Remove row" onClick={() => setRows(rows.filter((x) => x.id !== r.row.id))}>
+                    <button className="btn btn-ghost btn-icon row-del btn-danger" title="Remove row" onClick={() => act.remove(r.row.id)}>
                       <IconX size={14} />
                     </button>
                   </td>
                 </tr>
+                </Fragment>
               )
             })}
           </tbody>
@@ -773,18 +920,12 @@ function MobileComposition({
       const m = calc.rows.find((c) => c.row.id === r.id)?.material
       return m ? NOTE_ORDER.indexOf(m.note) : 3
     }
-    const grams = new Map(calc.rows.map((c) => [c.row.id, c.neatGrams]))
-    setRows([...rows].sort((a, b) => rank(a) - rank(b) || (grams.get(b.id) ?? 0) - (grams.get(a.id) ?? 0)))
+    act.sortByNote(rank, new Map(calc.rows.map((c) => [c.row.id, c.neatGrams])))
   }
+  const totals = sectionTotals(calc)
 
-  const move = (rid: string, dir: -1 | 1) => {
-    const i = rows.findIndex((r) => r.id === rid)
-    const j = i + dir
-    if (i < 0 || j < 0 || j >= rows.length) return
-    const next = [...rows]
-    ;[next[i], next[j]] = [next[j], next[i]]
-    setRows(next)
-  }
+  const act = useRowActions(formula, rows, setRows, settings)
+  const move = act.move
 
   const editing = calc.rows.find((r) => r.row.id === editId)
   const editIdx = editing ? calc.rows.indexOf(editing) : -1
@@ -795,7 +936,7 @@ function MobileComposition({
         <Seg
           value={formula.unit}
           onChange={(u) => update((f) => ({ ...f, unit: u }))}
-          options={(['g', 'drops', 'parts'] as const).map((u) => ({ value: u, label: UNIT_LABEL[u] }))}
+          options={(['g', 'drops'] as const).map((u) => ({ value: u, label: UNIT_NAME[u] }))}
         />
         <div className="spacer" />
         <button className="btn btn-ghost btn-sm" onClick={sortByNote} disabled={rows.length < 2}>
@@ -808,7 +949,18 @@ function MobileComposition({
           const m = r.material
           const entry = rowIfraEntry(calc.ifra, m, accords)
           return (
-            <button key={r.row.id} className={`m-row${entry?.status === 'over' ? ' over' : ''}`} onClick={() => setEditId(r.row.id)}>
+            <Fragment key={r.row.id}>
+            {r.row.section != null && (
+              <div className={`m-sec${idx === 0 ? ' first' : ''}`}>
+                <SectionHead
+                  label={r.row.section}
+                  totals={totals.get(r.row.id)}
+                  onRename={(v) => act.setSection(r.row.id, v)}
+                  onRemove={() => act.setSection(r.row.id, undefined)}
+                />
+              </div>
+            )}
+            <button className={`m-row${entry?.status === 'over' ? ' over' : ''}`} onClick={() => setEditId(r.row.id)}>
               <span className="m-row-no">{String(idx + 1).padStart(2, '0')}</span>
               <span className="m-row-main">
                 <span className="m-row-name">
@@ -844,6 +996,7 @@ function MobileComposition({
                 <IfraBadge entry={entry} />
               </span>
             </button>
+            </Fragment>
           )
         })}
       </div>
@@ -949,11 +1102,30 @@ function MobileComposition({
             <button className="btn btn-icon" title="Move down" disabled={editIdx >= rows.length - 1} onClick={() => move(editing.row.id, 1)}>
               ↓
             </button>
+            <button
+              className="btn"
+              title={editing.row.section != null ? 'Remove the divider above this row' : 'Add a divider above this row'}
+              onClick={() => act.setSection(editing.row.id, editing.row.section != null ? undefined : '')}
+            >
+              {editing.row.section != null ? '− Divider' : '+ Divider'}
+            </button>
+            {act.accordOf(editing.row) && (
+              <button
+                className="btn"
+                title="Replace the accord with its materials in real amounts"
+                onClick={() => {
+                  act.reduce(editing.row)
+                  setEditId(null)
+                }}
+              >
+                Reduce
+              </button>
+            )}
             <div className="spacer" />
             <button
               className="btn btn-danger"
               onClick={() => {
-                setRows(rows.filter((x) => x.id !== editing.row.id))
+                act.remove(editing.row.id)
                 setEditId(null)
               }}
             >
@@ -1009,7 +1181,7 @@ function Inspector({
                   {p.label}
                 </option>
               ))}
-              <option value="custom">Custom</option>
+              <option value="custom">Author</option>
             </select>
           </div>
           <div className="field">
@@ -1269,7 +1441,7 @@ function Collapsible({
 
 // ---------------------------------------------------------------- notes
 const STAGES: Record<TestStage, string> = { blotter: 'Blotter', skin: 'Skin', fabric: 'Fabric' }
-const PHASES: Record<TestPhase, string> = { opening: 'Opening', heart: 'Heart', drydown: 'Dry-down' }
+const PHASES: Record<TestPhase, string> = { opening: 'Opening', heart: 'Evolution', drydown: 'End' }
 
 function Notes({ formula, update }: { formula: Formula; update: (fn: (f: Formula) => Formula, history?: boolean) => void }) {
   const [text, setText] = useState('')

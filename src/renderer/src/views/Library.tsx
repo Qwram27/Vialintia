@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import type { Material, MaterialType, NoteLevel } from '@shared/types'
 import { NOTE_LABELS, NOTE_ORDER } from '@shared/defaults'
 import { familyById, useAccordIndex, useStore } from '@/store/store'
-import { confirmDialog, navigate, toast } from '@/store/ui'
+import { confirmDialog, navigate, openContextMenu, toast } from '@/store/ui'
 import { catalogNo } from '@/lib/archive'
 import { fmt, fmtSmart, fmtTrim, inkOn } from '@/lib/calc'
 import { csvToMaterials, materialsToCsv } from '@/lib/exports'
@@ -28,6 +28,7 @@ export function Library() {
   const [sort, setSort] = useState<SortKey>('name')
   const [selected, setSelected] = useState<string | null>(null)
   const mobile = useIsMobile()
+  const deleteMaterial = useStore((s) => s.deleteMaterial)
 
   const usage = useMemo(() => {
     const m = new Map<string, number>()
@@ -37,6 +38,35 @@ export function Library() {
     }
     return m
   }, [formulas])
+
+  const rowMenu = (e: React.MouseEvent, m: Material) =>
+    openContextMenu(e, [
+      { label: 'Edit', onSelect: () => setSelected(m.id) },
+      !!m.accordFormulaId && { label: 'Open accord formula', onSelect: () => navigate(`/formula/${m.accordFormulaId}`) },
+      {
+        label: 'Duplicate',
+        onSelect: () => {
+          const { id, aliasIds, accordFormulaId, createdAt, updatedAt, ...rest } = m
+          const c = addMaterial({ ...rest, name: `${m.name} copy` })
+          setSelected(c.id)
+          toast(`Duplicated ${m.name}`)
+        }
+      },
+      {
+        label: 'Delete',
+        danger: true,
+        sep: true,
+        onSelect: async () => {
+          const n = usage.get(m.id) ?? 0
+          const msg = n ? `“${m.name}” is used in ${n} formula${n > 1 ? 's' : ''}. Those rows will show as missing.` : `“${m.name}” will be removed from the library.`
+          if (await confirmDialog('Delete material?', msg)) {
+            deleteMaterial(m.id)
+            if (selected === m.id) setSelected(null)
+            toast('Material deleted')
+          }
+        }
+      }
+    ])
 
   const list = useMemo(() => {
     const query = q.trim().toLowerCase()
@@ -220,7 +250,7 @@ export function Library() {
                 {list.map((m) => {
                   const f = familyById(settings, m.family)
                   return (
-                    <tr key={m.id} className={m.id === selected ? 'sel' : ''} onClick={() => setSelected(m.id === selected ? null : m.id)}>
+                    <tr key={m.id} className={m.id === selected ? 'sel' : ''} onClick={() => setSelected(m.id === selected ? null : m.id)} onContextMenu={(e) => rowMenu(e, m)}>
                       <td className="l">
                         <div className="row">
                           <span className="dot" style={{ background: f.color }} />

@@ -37,6 +37,13 @@ export function Assemble({ id }: { id: string }) {
   const show = (v: number | null | undefined) => (v == null ? '—' : fmt(v, Math.max(0, Math.ceil(-Math.log10(step) - 1e-9))))
   const assemblies = formula.assemblies ?? []
   const draft = [...assemblies].reverse().find((a) => !a.finishedAt)
+  // Rows are counted in drops when the formula is written in drops (or the running session was).
+  const drops = (draft ? draft.unit : formula.unit) === 'drops'
+  const dropG = settings.dropMassG || 0.02
+  const toDrops = (g: number) => (g > 0 ? Math.max(1, Math.round(g / dropG)) : 0)
+  const ru = (v: number) => (drops ? Math.round(v) : r(v))
+  const showU = (v: number | null | undefined) => (v == null ? '—' : drops ? fmt(v, 0) : show(v))
+  const U = drops ? 'drops' : 'g'
   const history = assemblies.filter((a) => a.finishedAt).reverse()
   const labels = new Map(formula.versions.map((v) => [v.id, v.label]))
   const save = (fn: (list: Assembly[]) => Assembly[]) =>
@@ -51,9 +58,10 @@ export function Assemble({ id }: { id: string }) {
       concentrateG: calc.batch.concentrateG,
       alcoholG: r(calc.batch.alcoholG),
       alcoholActual: null,
+      unit: drops ? 'drops' : 'g',
       rows: calc.rows
         .filter((x) => x.material && x.batchGrams > 0)
-        .map((x) => ({ rowId: x.row.id, materialId: x.row.materialId, dilution: x.row.dilution, target: r(x.batchGrams), actual: null }))
+        .map((x) => ({ rowId: x.row.id, materialId: x.row.materialId, dilution: x.row.dilution, target: drops ? toDrops(x.batchGrams) : r(x.batchGrams), actual: null }))
     }
     save((list) => [...list.filter((x) => x.finishedAt), a])
   }
@@ -66,7 +74,7 @@ export function Assemble({ id }: { id: string }) {
         </div>
         <h1 className="page-title">{formula.name}</h1>
         <div className="page-sub">
-          Balance step {String(step)} g · set in Settings
+          {drops ? `Counting drops · 1 drop ≈ ${String(dropG)} g · set in Settings` : `Balance step ${String(step)} g · set in Settings`}
         </div>
       </div>
       <div className="btn-group">
@@ -89,7 +97,14 @@ export function Assemble({ id }: { id: string }) {
             <span className="k">Batch</span>
             <span className="v">{formula.batch.mode === 'bottles' ? `${formula.batch.bottles} × ${fmtSmart(formula.batch.bottleMl)} ml` : `${fmt(b.concentrateG, 2)} g concentrate`}</span>
           </div>
-          <div className="stat-row"><span className="k">Concentrate to weigh</span><span className="v">{show(r(b.concentrateG))} g</span></div>
+          {drops ? (
+            <div className="stat-row">
+              <span className="k">Concentrate to count</span>
+              <span className="v">{fmt(calc.rows.reduce((s, x) => s + (x.material ? toDrops(x.batchGrams) : 0), 0), 0)} drops · ≈ {show(r(b.concentrateG))} g</span>
+            </div>
+          ) : (
+            <div className="stat-row"><span className="k">Concentrate to weigh</span><span className="v">{show(r(b.concentrateG))} g</span></div>
+          )}
           <div className="stat-row"><span className="k">Then alcohol</span><span className="v">{show(r(b.alcoholG))} g · {fmt(b.alcoholMl, 1)} ml</span></div>
           <div className="stat-row"><span className="k">Ingredients</span><span className="v">{calc.rows.filter((x) => x.material && x.batchGrams > 0).length}</span></div>
           <p className="faint small">Change the batch size in the formula (Setup → Batch) before you start.</p>
@@ -113,24 +128,26 @@ export function Assemble({ id }: { id: string }) {
   const targetTotal = draft.rows.reduce((s, x) => s + x.target, 0)
   const doneCount = draft.rows.filter((x) => x.actual != null).length
   const setActual = (rowId: string, v: number | null) =>
-    patchDraft((a) => ({ ...a, rows: a.rows.map((x) => (x.rowId === rowId ? { ...x, actual: v == null ? null : r(v) } : x)) }))
+    patchDraft((a) => ({ ...a, rows: a.rows.map((x) => (x.rowId === rowId ? { ...x, actual: v == null ? null : ru(v) } : x)) }))
+  const doneTarget = draft.rows.filter((x) => x.actual != null).reduce((s, x) => s + x.target, 0)
+  const deviation = ru(weighed - doneTarget)
 
   return (
     <div className="page asm">
       {head}
       <div className="asm-summary card">
         <div className="metric"><div className="k">Done</div><div className="v">{doneCount}<small>/ {draft.rows.length}</small></div></div>
-        <div className="metric"><div className="k">Weighed</div><div className="v">{show(r(weighed))}<small>g</small></div></div>
-        <div className="metric"><div className="k">Target</div><div className="v">{show(r(targetTotal))}<small>g</small></div></div>
+        <div className="metric"><div className="k">{drops ? 'Counted' : 'Weighed'}</div><div className="v">{showU(ru(weighed))}<small>{U}</small></div></div>
+        <div className="metric"><div className="k">Target</div><div className="v">{showU(ru(targetTotal))}<small>{U}</small></div></div>
         <div className="metric">
           <div className="k">Deviation</div>
-          <div className="v">{doneCount ? `${weighed - draft.rows.filter((x) => x.actual != null).reduce((s, x) => s + x.target, 0) >= 0 ? '+' : ''}${show(r(weighed - draft.rows.filter((x) => x.actual != null).reduce((s, x) => s + x.target, 0)))}` : '—'}<small>g</small></div>
+          <div className="v">{doneCount ? `${deviation >= 0 ? '+' : ''}${showU(deviation)}` : '—'}<small>{U}</small></div>
         </div>
       </div>
 
       <div className="card asm-list">
         <div className="asm-row asm-headrow">
-          <span>N°</span><span>Material</span><span className="n">Target g</span><span className="n">Weighed g</span><span className="n">Scale</span><span />
+          <span>N°</span><span>Material</span><span className="n">Target {U}</span><span className="n">{drops ? 'Counted' : 'Weighed g'}</span><span className="n">{drops ? '≈ g' : 'Scale'}</span><span />
         </div>
         {rows.map((x) => {
           const m = materials.get(x.materialId)
@@ -143,13 +160,13 @@ export function Assemble({ id }: { id: string }) {
                   {m && <span className="dot" style={{ background: familyById(settings, m.family).color }} />}
                   {m?.name ?? 'Missing material'}
                 </span>
-                <span className="meta">{x.dilution < 100 ? `${fmtSmart(x.dilution)}% dilution` : 'neat'}{dev != null && Math.abs(dev) >= step / 2 ? ` · ${dev > 0 ? '+' : ''}${show(r(dev))} g` : ''}</span>
+                <span className="meta">{x.dilution < 100 ? `${fmtSmart(x.dilution)}% dilution` : 'neat'}{dev != null && (drops ? dev !== 0 : Math.abs(dev) >= step / 2) ? ` · ${dev > 0 ? '+' : ''}${showU(ru(dev))} ${U}` : ''}</span>
               </span>
-              <span className="n tgt">{show(x.target)}</span>
+              <span className="n tgt">{showU(x.target)}</span>
               <span className="n">
-                <NumberInput className="input asm-input" value={x.actual} min={0} allowEmpty placeholder={show(x.target)} onCommit={(v) => setActual(x.rowId, v)} />
+                <NumberInput className="input asm-input" value={x.actual} min={0} allowEmpty placeholder={showU(x.target)} onCommit={(v) => setActual(x.rowId, v)} />
               </span>
-              <span className="n faint">{show(x.reading)}</span>
+              <span className="n faint">{drops ? show(r((x.actual ?? x.target) * dropG)) : show(x.reading)}</span>
               <span className="n">
                 <button
                   className={`btn btn-icon${x.actual != null ? ' btn-primary' : ''}`}
@@ -166,13 +183,13 @@ export function Assemble({ id }: { id: string }) {
           <span className="no">+</span>
           <span className="mat">
             <span className="nm">Alcohol</span>
-            <span className="meta">add to the concentrate · {fmt(calc.batch.alcoholMl, 1)} ml</span>
+            <span className="meta">add to the concentrate · {fmt(calc.batch.alcoholMl, 1)} ml{drops ? ' · weighed in g' : ''}</span>
           </span>
-          <span className="n tgt">{show(draft.alcoholG)}</span>
+          <span className="n tgt">{show(draft.alcoholG)}{drops ? ' g' : ''}</span>
           <span className="n">
             <NumberInput className="input asm-input" value={draft.alcoholActual} min={0} allowEmpty placeholder={show(draft.alcoholG)} onCommit={(v) => patchDraft((a) => ({ ...a, alcoholActual: v == null ? null : r(v) }))} />
           </span>
-          <span className="n faint">{show(r(reading + (draft.alcoholActual ?? draft.alcoholG)))}</span>
+          <span className="n faint">{drops ? show(draft.alcoholActual ?? draft.alcoholG) : show(r(reading + (draft.alcoholActual ?? draft.alcoholG)))}</span>
           <span className="n">
             <button
               className={`btn btn-icon${draft.alcoholActual != null ? ' btn-primary' : ''}`}
@@ -186,7 +203,9 @@ export function Assemble({ id }: { id: string }) {
 
       <div className="row mt" style={{ flexWrap: 'wrap', gap: 8 }}>
         <span className="faint small" style={{ flex: '1 1 240px' }}>
-          Type what the scale shows, or tick ✓ if you hit the target. “Scale” is the reading when everything goes into one tared vessel.
+          {drops
+            ? 'Type how many drops went in, or tick ✓ if you hit the target. “≈ g” is the drop count converted with the drop mass from Settings.'
+            : 'Type what the scale shows, or tick ✓ if you hit the target. “Scale” is the reading when everything goes into one tared vessel.'}
         </span>
         <button
           className="btn btn-ghost"
@@ -221,13 +240,15 @@ function History({ history, labels, show }: { history: Assembly[]; labels: Map<s
         const weighed = done.reduce((s, x) => s + (x.actual ?? 0), 0)
         const target = done.reduce((s, x) => s + x.target, 0)
         const worst = done.reduce((w, x) => (x.target > 0 ? Math.max(w, Math.abs((x.actual! - x.target) / x.target)) : w), 0)
+        const u = a.unit === 'drops' ? 'drops' : 'g'
+        const v = (n: number) => (a.unit === 'drops' ? fmt(n, 0) : show(n))
         return (
           <div className="stat-row" key={a.id}>
             <span className="k">
               {new Date(a.finishedAt!).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' })} · {labels.get(a.versionId) ?? '—'}
             </span>
             <span className="v">
-              {show(weighed)} / {show(target)} g · {done.length}/{a.rows.length} · max dev {fmtSmart(worst * 100)}%
+              {v(weighed)} / {v(target)} {u} · {done.length}/{a.rows.length} · max dev {fmtSmart(worst * 100)}%
             </span>
           </div>
         )

@@ -108,3 +108,30 @@ export async function withProgress<T>(label: string, task: (step: (value: number
     setProgress(null)
   }
 }
+
+// ---------- context menu (right click) ----------
+export interface MenuItem {
+  label: string
+  onSelect: () => void
+  danger?: boolean
+  disabled?: boolean
+  /** Draw a hairline above this item. */
+  sep?: boolean
+}
+interface MenuReq {
+  x: number
+  y: number
+  items: MenuItem[]
+}
+export const useContextMenu = create<{ menu: MenuReq | null }>(() => ({ menu: null }))
+
+/** onContextMenu handler: opens the app menu at the cursor instead of the native one. */
+export function openContextMenu(e: { clientX: number; clientY: number; preventDefault(): void; stopPropagation(): void }, items: (MenuItem | false | null | undefined)[]) {
+  e.preventDefault()
+  e.stopPropagation()
+  const list = items.filter(Boolean) as MenuItem[]
+  if (list.length) useContextMenu.setState({ menu: { x: e.clientX, y: e.clientY, items: list } })
+}
+export function closeContextMenu() {
+  useContextMenu.setState({ menu: null })
+}

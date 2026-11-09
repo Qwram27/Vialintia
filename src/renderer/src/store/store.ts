@@ -85,11 +85,13 @@ function normalizeFormula(f: Formula): Formula {
       const m = /^mod\s*(\d+)$/i.exec(v.label.trim())
       return m ? { ...v, label: `V${m[1]}` } : v
     }),
+    // "Parts" was removed — parts were treated as grams anyway.
+    unit: f.unit === 'drops' ? 'drops' : 'g',
+    // "Draft" status was removed — it meant the same as "Testing".
+    status: f.status === 'final' ? 'final' : 'testing',
     tags: f.tags ?? [],
     notes: f.notes ?? [],
     assemblies: f.assemblies ?? [],
-    // 'draft' was removed — earlier drafts are now 'testing'
-    status: (f.status as string) === 'final' ? 'final' : 'testing',
     description: f.description ?? '',
     batch: { ...{ mode: 'bottles' as const, bottles: 1, bottleMl: 50, massG: 10 }, ...(f.batch ?? {}) },
     currentVersionId: versions.some((v) => v.id === f.currentVersionId) ? f.currentVersionId : versions[versions.length - 1].id
