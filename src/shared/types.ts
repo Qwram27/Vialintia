@@ -30,6 +30,8 @@ export interface FormulaRow {
   amount: number // in the formula's unit
   dilution: number // % of material in what is weighed (100 = neat)
   solvent?: string
+  /** A divider starts above this row (e.g. an accord or a layer); the label may be empty. */
+  section?: string
 }
 
 export interface FormulaVersion {

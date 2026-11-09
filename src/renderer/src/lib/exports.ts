@@ -96,7 +96,8 @@ export function formulaToPdfHtml(formula: Formula, versionLabel: string, calc: F
       const m = r.material
       const ifra = m ? calc.ifra.byMaterial.get(m.id) : undefined
       const flag = ifra?.status === 'over'
-      return `<tr${flag ? ' class="flag"' : ''}>
+      const divider = r.row.section != null ? `<tr class="sec"><td colspan="11">${esc(r.row.section || '—')}</td></tr>` : ''
+      return `${divider}<tr${flag ? ' class="flag"' : ''}>
         <td class="c">${i + 1}</td>
         <td class="l">${esc(m?.name ?? 'Missing material')}</td>
         <td class="l mono">${esc(m?.cas ?? '')}</td>
@@ -166,6 +167,7 @@ export function formulaToPdfHtml(formula: Formula, versionLabel: string, calc: F
   .comp tr.flag td { font-weight: bold; background: #ececec; }
   .comp tfoot td { border: 1px solid #000; font-weight: bold; background: #f0f0f0; }
   .chk { width: 22px; }
+  .comp tr.sec td { text-align: left; font-weight: bold; font-size: 8pt; letter-spacing: .12em; text-transform: uppercase; padding-top: 8px; background: #f4f4f4; }
   .mono { font-family: Consolas, 'Courier New', monospace; font-size: 7.5pt; white-space: nowrap; }
   .comp td.c { white-space: nowrap; }
   .summary { margin-top: 10px; font-size: 8.5pt; line-height: 1.6; }

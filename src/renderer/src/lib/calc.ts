@@ -437,8 +437,10 @@ export function inkOn(hex: string): string {
  * Replace an accord row with the accord formula's own rows (one level; nested accords stay as
  * accord rows and can be reduced again). Amounts are real: each constituent gets its share of the
  * weighed accord mass, and the accord row's dilution is folded into each constituent's dilution,
- * so total weighed mass and every neat amount stay exactly the same. Constituents that already
- * appear in the formula with the same dilution and solvent are added to that row.
+ * so total weighed mass and every neat amount stay exactly the same. The constituents stay in their
+ * own block (not merged into rows elsewhere in the formula).
+ * The new block gets a divider labelled with the accord (the row's own divider label wins), and
+ * the row after the block gets a plain divider so the block stays separate.
  */
 export function reduceAccordRow(
   rows: FormulaRow[],
@@ -446,7 +448,8 @@ export function reduceAccordRow(
   unit: Formula['unit'],
   accord: Formula,
   settings: Settings,
-  newId: () => string
+  newId: () => string,
+  label = accord.name
 ): FormulaRow[] | null {
   const idx = rows.findIndex((r) => r.id === rowId)
   const row = rows[idx]
@@ -474,12 +477,40 @@ export function reduceAccordRow(
       dilution: dilution > 0 ? dilution : 100,
       solvent: dilution < 100 ? (r.dilution < 100 ? r.solvent : undefined) ?? row.solvent ?? 'EtOH' : undefined
     }
-    const same = [...rest, ...inserted].find((x) => key(x) === key(next))
+    const same = inserted.find((x) => key(x) === key(next))
     const target = same ?? next
     if (same) same.amount += next.amount
     else inserted.push(next)
     touched.add(target)
   })
   touched.forEach((r) => (r.amount = round(r.amount)))
+  if (inserted.length) {
+    inserted[0].section = row.section?.trim() ? row.section : label
+    const after = rest[idx]
+    if (after && after.section == null) after.section = ''
+  } else if (row.section != null && rest[idx] && rest[idx].section == null) {
+    rest[idx].section = row.section
+  }
   return [...rest.slice(0, idx), ...inserted, ...rest.slice(idx)]
+}
+
+// ---------------------------------------------------------------- dividers
+/** Remove a row; its divider moves to the next row (unless that one already starts a section). */
+export function removeRow(rows: FormulaRow[], rowId: string): FormulaRow[] {
+  const i = rows.findIndex((r) => r.id === rowId)
+  if (i < 0) return rows
+  const gone = rows[i]
+  const next = rows.filter((r) => r.id !== rowId)
+  if (gone.section != null && next[i] && next[i].section == null) next[i] = { ...next[i], section: gone.section }
+  return next
+}
+
+/** Split rows into blocks at dividers (the first block may have no divider). */
+export function sectionBlocks<T extends { section?: string }>(rows: T[]): T[][] {
+  const out: T[][] = []
+  rows.forEach((r, i) => {
+    if (i === 0 || r.section != null) out.push([r])
+    else out[out.length - 1].push(r)
+  })
+  return out
 }

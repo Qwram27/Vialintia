@@ -1003,3 +1003,22 @@ svg text { font-family: var(--mono); }
 .ctx-item.danger:hover:not(:disabled) { color: var(--over); background: var(--over-bg); }
 .ctx-item.sep { margin-top: 5px; position: relative; }
 .ctx-item.sep::before { content: ''; position: absolute; left: 6px; right: 6px; top: -3px; border-top: 1px solid var(--line); }
+
+/* ---------- composition dividers (like the inspector's Product / Batch heads) ---------- */
+.ftable tr.sec-row:hover { background: transparent; }
+.ftable tr.sec-row td { height: auto; padding: 26px 6px 8px; border-bottom: 1px solid var(--line); }
+.ftable tr.sec-row.first td { padding-top: 14px; }
+.sec-head { display: flex; align-items: center; gap: 12px; }
+.sec-head .spacer { flex: 1; }
+.sec-input {
+  all: unset; box-sizing: border-box; font: inherit; font-size: 9.5px; font-weight: 500; letter-spacing: .24em; text-transform: uppercase;
+  color: var(--text-2); padding: 3px 0; border-bottom: 1px solid transparent; max-width: 60%;
+}
+.sec-input::placeholder { color: var(--faint); }
+.sec-input:focus { border-bottom-color: var(--line-2); }
+.sec-head small { font-size: 9.5px; color: var(--faint); letter-spacing: .16em; text-transform: uppercase; }
+.sec-head .row-del { width: 24px; height: 24px; }
+.sec-head:hover .row-del { opacity: 1; }
+.m-sec { padding: 16px 4px 6px; border-bottom: 1px solid var(--line); margin-bottom: 2px; }
+.m-sec.first { padding-top: 4px; }
+.m-sec .row-del { opacity: 1; }

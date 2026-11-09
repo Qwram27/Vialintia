@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_SETTINGS } from '@shared/defaults'
 import type { Formula, Material } from '@shared/types'
-import { buildAccordIndex, computeFormula, diffVersions, evolution, ifraStatus, parseNum, reduceAccordRow, roundToStep, rowIfraEntry, scaleRows } from './calc'
+import { buildAccordIndex, computeFormula, diffVersions, evolution, ifraStatus, parseNum, reduceAccordRow, removeRow, roundToStep, sectionBlocks, rowIfraEntry, scaleRows } from './calc'
 import { SEED_VERSION, seedMaterials, upgradeSeedLibrary } from '@/data/seedMaterials'
 
 const now = new Date().toISOString()
@@ -407,20 +407,46 @@ describe('reduce accord', () => {
     expect(weighed).toBeCloseTo(10)
   })
 
-  it('merges into an existing row of the same material and dilution', () => {
+  it('keeps constituents in their own block, not merged into other rows', () => {
     const rows = [
       { id: 'a-row', materialId: 'a', amount: 1, dilution: 100 },
       { id: 'acc-row', materialId: 'ACC', amount: 10, dilution: 100 }
     ]
     const out = reduceAccordRow(rows, 'acc-row', 'g', accord, settings, id)!
-    expect(out).toHaveLength(2)
-    expect(out[0]).toMatchObject({ id: 'a-row', amount: 7 })
-    expect(rows[0].amount).toBe(1)
+    expect(out).toHaveLength(3)
+    expect(out[0]).toMatchObject({ id: 'a-row', amount: 1 })
+    expect(out[1]).toMatchObject({ materialId: 'a', amount: 6 })
   })
 
   it('converts to drops in a drops formula', () => {
     const rows = [{ id: 'acc-row', materialId: 'ACC', amount: 10, dilution: 100 }]
     const out = reduceAccordRow(rows, 'acc-row', 'drops', accord, settings, id)!
     expect(out.reduce((s, r) => s + r.amount, 0)).toBeCloseTo(10)
+  })
+})
+
+describe('dividers', () => {
+  const accord = formula({
+    id: 'acc', name: 'Citrus',
+    versions: [{ id: 'v', label: 'V1', createdAt: now, rows: [
+      { id: 'r1', materialId: 'a', amount: 1, dilution: 100 },
+      { id: 'r2', materialId: 'b', amount: 1, dilution: 100 }
+    ] }]
+  })
+  it('reduce wraps the constituents in a labelled block', () => {
+    const rows = [
+      { id: 'acc-row', materialId: 'ACC', amount: 2, dilution: 100 },
+      { id: 'y', materialId: 'd', amount: 2, dilution: 100 }
+    ]
+    const out = reduceAccordRow(rows, 'acc-row', 'g', accord, settings, () => Math.random().toString(), 'Citrus accord')!
+    expect(out.map((r) => r.section)).toEqual(['Citrus accord', undefined, ''])
+    expect(sectionBlocks(out).map((b) => b.length)).toEqual([2, 1])
+  })
+  it('a removed row hands its divider to the next row', () => {
+    const rows = [
+      { id: 'x', materialId: 'a', amount: 1, dilution: 100, section: 'Top' },
+      { id: 'y', materialId: 'b', amount: 1, dilution: 100 }
+    ]
+    expect(removeRow(rows, 'x')).toEqual([{ id: 'y', materialId: 'b', amount: 1, dilution: 100, section: 'Top' }])
   })
 })
