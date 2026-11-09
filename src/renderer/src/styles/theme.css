@@ -903,3 +903,19 @@ svg text { font-family: var(--mono); }
 .btn-primary { background: var(--fill); border-color: var(--fill); color: var(--fill-ink); box-shadow: inset 0 1px 0 rgba(255,255,255,.35); }
 .btn-primary:hover { background: var(--fill-hi); border-color: var(--fill-hi); }
 .vchip.on { background: var(--fill); border-color: var(--fill); color: var(--fill-ink); }
+
+/* ─────────────────────────────────────────────────────────────
+   1.4.9 — selected / primary = solid black, white type, hairline border
+   ───────────────────────────────────────────────────────────── */
+:root {
+  --fill: #000;
+  --fill-hi: #0c0c0d;
+  --fill-ink: #ececec;
+  --fill-line: rgba(255, 255, 255, .26);
+}
+.seg-thumb { background: var(--fill); box-shadow: inset 0 0 0 1px var(--fill-line); }
+.seg button.on, .seg button.on:hover { color: var(--fill-ink); }
+.seg button.on .count, .seg button.on .faint { color: var(--muted); }
+.btn-primary { background: var(--fill); border-color: var(--fill-line); color: var(--fill-ink); box-shadow: none; font-weight: 500; }
+.btn-primary:hover { background: var(--fill-hi); border-color: rgba(255,255,255,.4); }
+.vchip.on { background: var(--fill); border-color: var(--fill-line); color: var(--fill-ink); }

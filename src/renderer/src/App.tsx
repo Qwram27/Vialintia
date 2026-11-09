@@ -90,7 +90,7 @@ export function App() {
           )}
           <div className="sidebar-foot">
             <span>Offline</span>
-            <span>v1.4.8</span>
+            <span>v1.4.9</span>
           </div>
         </aside>
       )}

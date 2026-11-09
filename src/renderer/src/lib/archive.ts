@@ -8,15 +8,15 @@ export function catalogNo(f: Formula, all: Formula[]): string {
 }
 
 /**
- * Season code from a date: SS (Mar–Aug) / AW (Sep–Feb).
- * An AW season carries the year it runs into: Sep 2026 – Feb 2027 = AW27.
+ * Season code from a date: SS (Mar–Aug) / AV (Sep–Feb, autumn–winter; owner's label).
+ * An AV season carries the year it runs into: Sep 2026 – Feb 2027 = AV27.
  */
 export function seasonCode(iso: string): string {
   const d = new Date(iso)
   const m = d.getMonth()
   const y = d.getFullYear()
   if (m >= 2 && m <= 7) return `SS${String(y).slice(2)}`
-  return `AW${String(m >= 8 ? y + 1 : y).slice(2)}`
+  return `AV${String(m >= 8 ? y + 1 : y).slice(2)}`
 }
 
 export function shortDate(iso: string): string {

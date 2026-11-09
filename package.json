@@ -1,7 +1,7 @@
 {
   "name": "vialintia",
   "productName": "Vialintia",
-  "version": "1.4.8",
+  "version": "1.4.9",
   "description": "Vialintia – fine fragrance formulation studio",
   "author": "Vialintia",
   "main": "./out/main/index.js",
