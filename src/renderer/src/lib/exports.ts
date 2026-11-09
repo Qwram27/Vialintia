@@ -81,7 +81,7 @@ export function formulaToCsv(formula: Formula, calc: FormulaCalc, settings: Sett
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!)
 
 export function formulaToPdfHtml(formula: Formula, versionLabel: string, calc: FormulaCalc, settings: Settings, no = ''): string {
-  const product = formula.productType === 'custom' ? 'Custom' : PRODUCT_PRESETS[formula.productType].label
+  const product = formula.productType === 'custom' ? 'Author' : PRODUCT_PRESETS[formula.productType].label
   const unit = formula.unit === 'drops' ? 'drops' : formula.unit === 'parts' ? 'parts' : 'g'
   const b = calc.batch
   const cur = settings.currency

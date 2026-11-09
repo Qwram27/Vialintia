@@ -5,7 +5,7 @@ import { NOTE_LABELS, NOTE_ORDER, PRODUCT_PRESETS } from '@shared/defaults'
 import { currentVersion, familyById, useAccordIndex, useMaterialMap, useStore, withRows } from '@/store/store'
 import { confirmDialog, navigate, openContextMenu, toast, withProgress } from '@/store/ui'
 import { isWeb } from '@/platform'
-import { computeFormula, fmt, fmtSmart, inkOn, reduceAccordRow, removeRow, roundToStep, sectionBlocks, rowIfraEntry, scaleRows, type FormulaCalc } from '@/lib/calc'
+import { computeFormula, fmt, fmtSmart, inkOn, moveRow, reduceAccordRow, removeRow, roundToStep, sectionBlocks, stepRow, type RowDrop, rowIfraEntry, scaleRows, type FormulaCalc } from '@/lib/calc'
 import { formulaToCsv, formulaToPdfHtml } from '@/lib/exports'
 import { uid } from '@/lib/id'
 import { NumberInput } from '@/components/NumberInput'
@@ -522,7 +522,7 @@ function SectionHead({
         className="sec-input"
         value={text}
         placeholder="Section"
-        size={Math.max(7, text.length + 1)}
+        style={{ width: `calc(${Math.max(7, text.length + 1)}ch + ${Math.max(7, text.length + 1) * 0.24}em)` }}
         onChange={(e) => setText(e.target.value)}
         onBlur={() => text.trim() !== label && onRename(text.trim())}
         onKeyDown={(e) => {
@@ -530,12 +530,12 @@ function SectionHead({
           if (e.key === 'Enter' || e.key === 'Escape') (e.target as HTMLInputElement).blur()
         }}
       />
+      <span className="spacer" />
       {totals && (
         <small>
           {fmt(totals.weighed, 2)}% · {totals.count} mat.
         </small>
       )}
-      <span className="spacer" />
       <button className="btn btn-ghost btn-icon row-del" title="Remove divider" onClick={onRemove}>
         <IconX size={14} />
       </button>
@@ -561,14 +561,18 @@ function useRowActions(formula: Formula, rows: FormulaRow[], setRows: (rows: For
     setRows(next)
     toast(`${m.name} reduced to its materials${added > 0 ? ` · ${added} row${added > 1 ? 's' : ''}` : ''}`)
   }
-  const move = (rid: string, dir: -1 | 1) => {
-    const i = rows.findIndex((r) => r.id === rid)
-    const j = i + dir
-    if (i < 0 || j < 0 || j >= rows.length) return
-    const next = [...rows]
-    ;[next[i], next[j]] = [next[j], next[i]]
+  /** Apply a reorder; say so when a divider was left empty and dropped (Ctrl+Z brings it back). */
+  const reorder = (next: FormulaRow[]) => {
+    const labels = (rs: FormulaRow[]) => rs.filter((r) => r.section != null).map((r) => r.section as string)
+    const before = labels(rows)
+    const after = labels(next)
+    if (after.length < before.length) {
+      const lost = before.find((l) => !after.includes(l))
+      toast(lost ? `Section “${lost}” removed — it had no materials left` : 'Empty section removed')
+    }
     setRows(next)
   }
+  const move = (rid: string, dir: -1 | 1) => reorder(stepRow(rows, rid, dir))
   const duplicate = (r: FormulaRow) => {
     const i = rows.findIndex((x) => x.id === r.id)
     setRows([...rows.slice(0, i + 1), { ...r, id: uid() }, ...rows.slice(i + 1)])
@@ -588,7 +592,7 @@ function useRowActions(formula: Formula, rows: FormulaRow[], setRows: (rows: For
         return sorted
       })
     )
-  return { accordOf, reduce, move, duplicate, remove, setSection, sortByNote }
+  return { accordOf, reduce, move, reorder, duplicate, remove, setSection, sortByNote }
 }
 
 function Composition({
@@ -605,7 +609,7 @@ function Composition({
   const [adding, setAdding] = useState(false)
   const [focusRow, setFocusRow] = useState<string | null>(null)
   const [dragId, setDragId] = useState<string | null>(null)
-  const [overId, setOverId] = useState<string | null>(null)
+  const [over, setOver] = useState<RowDrop | null>(null)
   const [armed, setArmed] = useState<string | null>(null)
   const amountRefs = useRef(new Map<string, HTMLInputElement>())
   const showBatch = calc.batch.concentrateG > 0
@@ -655,15 +659,25 @@ function Composition({
     else setAdding(true)
   }
 
-  const drop = (targetId: string) => {
-    if (!dragId || dragId === targetId) return
-    const from = rows.findIndex((r) => r.id === dragId)
-    const to = rows.findIndex((r) => r.id === targetId)
-    const next = [...rows]
-    const [moved] = next.splice(from, 1)
-    next.splice(to > from ? to - 1 : to, 0, moved)
-    setRows(next)
+  const drop = () => {
+    if (dragId && over) act.reorder(moveRow(rows, dragId, over))
+    setOver(null)
   }
+  const endDrag = () => {
+    setDragId(null)
+    setOver(null)
+    setArmed(null)
+  }
+  /** Upper half of a row = drop above it, lower half = below it. */
+  const overRow = (e: React.DragEvent, rowId: string) => {
+    if (!dragId) return
+    e.preventDefault()
+    const box = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    const where = e.clientY < box.top + box.height / 2 ? 'above' : 'below'
+    if (!over || !('rowId' in over) || over.rowId !== rowId || over.where !== where) setOver({ rowId, where })
+  }
+  const dropClass = (rowId: string) =>
+    !dragId || dragId === rowId || !over || !('rowId' in over) || over.rowId !== rowId ? '' : over.where === 'above' ? ' drop-above' : ' drop-below'
 
   return (
     <>
@@ -703,7 +717,18 @@ function Composition({
               return (
                 <Fragment key={r.row.id}>
                 {r.row.section != null && (
-                  <tr className={`sec-row${idx === 0 ? ' first' : ''}`}>
+                  <tr
+                    className={`sec-row${idx === 0 ? ' first' : ''}${dragId && over && 'sectionOf' in over && over.sectionOf === r.row.id ? ' drop-below' : ''}`}
+                    onDragOver={(e) => {
+                      if (!dragId) return
+                      e.preventDefault()
+                      if (!over || !('sectionOf' in over) || over.sectionOf !== r.row.id) setOver({ sectionOf: r.row.id })
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault()
+                      drop()
+                    }}
+                  >
                     <td colSpan={showBatch ? 10 : 9} className="l">
                       <SectionHead
                         label={r.row.section}
@@ -719,26 +744,18 @@ function Composition({
                 )}
                 <tr
                   draggable={armed === r.row.id}
-                  className={`${dragId === r.row.id ? 'dragging' : ''}${overId === r.row.id && dragId !== r.row.id ? ' drop-above' : ''}`}
+                  className={`${dragId === r.row.id ? 'dragging' : ''}${dropClass(r.row.id)}`}
                   onContextMenu={(e) => rowMenu(e, r.row, idx)}
                   onDragStart={(e) => {
                     setDragId(r.row.id)
                     e.dataTransfer.effectAllowed = 'move'
                   }}
-                  onDragOver={(e) => {
-                    if (!dragId) return
-                    e.preventDefault()
-                    setOverId(r.row.id)
-                  }}
+                  onDragOver={(e) => overRow(e, r.row.id)}
                   onDrop={(e) => {
                     e.preventDefault()
-                    drop(r.row.id)
+                    drop()
                   }}
-                  onDragEnd={() => {
-                    setDragId(null)
-                    setOverId(null)
-                    setArmed(null)
-                  }}
+                  onDragEnd={endDrag}
                 >
                   <td style={{ width: 30 }}>
                     <span className="rowno">{String(idx + 1).padStart(2, '0')}</span>
@@ -1163,7 +1180,7 @@ function Inspector({
                   {p.label}
                 </option>
               ))}
-              <option value="custom">Custom</option>
+              <option value="custom">Author</option>
             </select>
           </div>
           <div className="field">

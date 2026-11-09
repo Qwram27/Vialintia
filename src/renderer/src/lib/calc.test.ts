@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_SETTINGS } from '@shared/defaults'
 import type { Formula, Material } from '@shared/types'
-import { buildAccordIndex, computeFormula, diffVersions, evolution, ifraStatus, parseNum, reduceAccordRow, removeRow, roundToStep, sectionBlocks, rowIfraEntry, scaleRows } from './calc'
+import { buildAccordIndex, computeFormula, diffVersions, evolution, ifraStatus, moveRow, parseNum, reduceAccordRow, removeRow, roundToStep, sectionBlocks, stepRow, rowIfraEntry, scaleRows } from './calc'
 import { SEED_VERSION, seedMaterials, upgradeSeedLibrary } from '@/data/seedMaterials'
 
 const now = new Date().toISOString()
@@ -448,5 +448,34 @@ describe('dividers', () => {
       { id: 'y', materialId: 'b', amount: 1, dilution: 100 }
     ]
     expect(removeRow(rows, 'x')).toEqual([{ id: 'y', materialId: 'b', amount: 1, dilution: 100, section: 'Top' }])
+  })
+})
+
+describe('moving rows between dividers', () => {
+  const R = (id: string, section?: string) => ({ id, materialId: id, amount: 1, dilution: 100, ...(section != null ? { section } : {}) })
+  // [a b] | A: [c d] | B: [e]
+  const rows = [R('a'), R('b'), R('c', 'A'), R('d'), R('e', 'B')]
+  const view = (rs: { id: string; section?: string }[]) => rs.map((r) => (r.section != null ? `|${r.section} ${r.id}` : r.id)).join(' ')
+
+  it('dividers stay in place when their first row moves away', () => {
+    expect(view(moveRow(rows, 'c', { rowId: 'a', where: 'above' }))).toBe('c a b |A d |B e')
+  })
+  it('dropping above the first row of a section joins that section', () => {
+    expect(view(moveRow(rows, 'a', { rowId: 'c', where: 'above' }))).toBe('b |A a c d |B e')
+  })
+  it('dropping below the last row of a section stays in it', () => {
+    expect(view(moveRow(rows, 'a', { rowId: 'd', where: 'below' }))).toBe('b |A c d a |B e')
+  })
+  it('dropping on a divider makes the row first in that section', () => {
+    expect(view(moveRow(rows, 'a', { sectionOf: 'e' }))).toBe('b |A c d |B a e')
+  })
+  it('a divider left without rows disappears', () => {
+    expect(view(moveRow(rows, 'e', { rowId: 'a', where: 'below' }))).toBe('a e b |A c d')
+  })
+  it('phone steps cross dividers one at a time', () => {
+    expect(view(stepRow(rows, 'b', 1))).toBe('a |A b c d |B e')
+    expect(view(stepRow(rows, 'c', -1))).toBe('a b c |A d |B e')
+    expect(view(stepRow(rows, 'd', 1))).toBe('a b |A c |B d e')
+    expect(view(stepRow(rows, 'e', -1))).toBe('a b |A c d e')
   })
 })

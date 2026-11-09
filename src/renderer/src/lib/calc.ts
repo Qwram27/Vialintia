@@ -514,3 +514,49 @@ export function sectionBlocks<T extends { section?: string }>(rows: T[]): T[][] 
   })
   return out
 }
+
+/** Where a dragged row lands: above / below a row, or first in the section that starts at a row. */
+export type RowDrop = { rowId: string; where: 'above' | 'below' } | { sectionOf: string }
+
+type Item = { h: string } | { r: FormulaRow }
+
+/**
+ * Move a row while dividers stay where they are: the row leaves its section and joins the one it
+ * is dropped into. A divider left with no rows disappears.
+ */
+export function moveRow(rows: FormulaRow[], rowId: string, to: RowDrop): FormulaRow[] {
+  const items: Item[] = []
+  for (const r of rows) {
+    if (r.section != null) items.push({ h: r.section })
+    items.push({ r: { ...r, section: undefined } })
+  }
+  const isRow = (it: Item | undefined, id?: string): it is { r: FormulaRow } => !!it && 'r' in it && (id == null || it.r.id === id)
+  const from = items.findIndex((it) => isRow(it, rowId))
+  if (from < 0) return rows
+  const targetId = 'sectionOf' in to ? to.sectionOf : to.rowId
+  if (targetId === rowId) return rows
+  const [moved] = items.splice(from, 1)
+  const t = items.findIndex((it) => isRow(it, targetId))
+  if (t < 0) return rows
+  items.splice('sectionOf' in to || to.where === 'above' ? t : t + 1, 0, moved)
+  const out: FormulaRow[] = []
+  let pending: string | undefined
+  for (const it of items) {
+    if ('h' in it) pending = it.h
+    else {
+      out.push(pending != null ? { ...it.r, section: pending } : it.r)
+      pending = undefined
+    }
+  }
+  return out
+}
+
+/** Phone up / down: one step, crossing a divider into the neighbouring section. */
+export function stepRow(rows: FormulaRow[], rowId: string, dir: -1 | 1): FormulaRow[] {
+  const i = rows.findIndex((r) => r.id === rowId)
+  const row = rows[i]
+  const other = rows[i + dir]
+  if (!row || !other) return rows
+  if (dir === -1) return moveRow(rows, rowId, { rowId: other.id, where: row.section != null ? 'below' : 'above' })
+  return moveRow(rows, rowId, other.section != null ? { sectionOf: other.id } : { rowId: other.id, where: 'below' })
+}
