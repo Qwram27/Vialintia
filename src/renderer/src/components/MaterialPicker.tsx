@@ -121,7 +121,6 @@ export function MaterialPicker({ material, missing, onPick, autoOpen, onClose }:
           <div
             key={m.id}
             className={`picker-opt${i === hl ? ' hl' : ''}`}
-            style={{ '--i': Math.min(i, 14) } as React.CSSProperties}
             onMouseEnter={() => setHl(i)}
             onMouseDown={(e) => {
               e.preventDefault()

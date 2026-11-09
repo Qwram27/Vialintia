@@ -9,13 +9,12 @@ import { Compare } from '@/views/Compare'
 import { SettingsView } from '@/views/Settings'
 import { ConfirmHost, ToastHost } from '@/components/Overlays'
 import { useIsMobile } from '@/lib/useMobile'
-import { IconCompare, IconFlask, IconSettings, IconVial } from '@/components/Icons'
 
 const NAV = [
-  { key: 'dashboard', label: 'Formulas', path: '/', Icon: IconFlask },
-  { key: 'library', label: 'Materials', path: '/library', Icon: IconVial },
-  { key: 'compare', label: 'Compare', path: '/compare', Icon: IconCompare },
-  { key: 'settings', label: 'Settings', path: '/settings', Icon: IconSettings }
+  { key: 'dashboard', label: 'Formulas', path: '/' },
+  { key: 'library', label: 'Materials', path: '/library' },
+  { key: 'compare', label: 'Compare', path: '/compare' },
+  { key: 'settings', label: 'Settings', path: '/settings' }
 ] as const
 
 export function App() {
@@ -90,7 +89,7 @@ export function App() {
           )}
           <div className="sidebar-foot">
             <span>Offline</span>
-            <span>v1.4.2</span>
+            <span>v1.4.3</span>
           </div>
         </aside>
       )}
@@ -103,8 +102,7 @@ export function App() {
         {route.name === 'settings' && <SettingsView />}
       </main>
       {mobile && (
-        <nav className="tabbar" aria-label="Sections" style={{ '--tab': Math.max(0, NAV.findIndex((n) => n.key === active)) } as React.CSSProperties}>
-          <span className="tab-thumb" aria-hidden />
+        <nav className="tabbar" aria-label="Sections">
           {NAV.map((n, i) => (
             <button
               key={n.key}
@@ -112,11 +110,8 @@ export function App() {
               aria-current={active === n.key ? 'page' : undefined}
               onClick={() => navigate(n.path)}
             >
-              <n.Icon size={21} />
-              <span className="lbl">
-                <span className="idx">{String(i + 1).padStart(2, '0')}</span>
-                {n.label}
-              </span>
+              <span className="idx">{String(i + 1).padStart(2, '0')}</span>
+              <span className="lbl">{n.label}</span>
             </button>
           ))}
         </nav>
@@ -158,9 +153,7 @@ function TopBar({ route, scrolled }: { route: Route; scrolled: boolean }) {
       </div>
       <div className={`savestate ${error ? 'error' : saving ? 'saving' : 'saved'}`} role="status" aria-live="polite">
         <i />
-        <span key={error ? 'e' : saving ? 's' : 'd'} className="savestate-label">
-          {error ? 'Not saved' : saving ? 'Saving' : 'Saved'}
-        </span>
+        {error ? 'Not saved' : saving ? 'Saving' : 'Saved'}
       </div>
     </div>
   )

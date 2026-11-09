@@ -51,10 +51,3 @@ export const IconLayers = (p: P) => (
 export const IconFolder = (p: P) => <Base {...p}><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /></Base>
 export const IconDrop = (p: P) => <Base {...p}><path d="M12 3s6 6.4 6 11a6 6 0 0 1-12 0c0-4.6 6-11 6-11z" /></Base>
 export const IconReset = (p: P) => <Base {...p}><path d="M4 12a8 8 0 1 0 2.3-5.7L4 8.6" /><path d="M4 4v4.6h4.6" /></Base>
-export const IconVial = (p: P) => (
-  <Base {...p}><path d="M9 3h6M10 3v15a2 2 0 0 0 4 0V3" /><path d="M10 12h4" /></Base>
-)
-export const IconChevron = (p: P) => <Base {...p}><path d="m6 9 6 6 6-6" /></Base>
-export const IconCloudCheck = (p: P) => (
-  <Base {...p}><path d="M7 18a4.5 4.5 0 0 1-.6-8.96A6 6 0 0 1 18 9.5a4 4 0 0 1-.5 8.5H7z" /><path d="m9.5 13.5 2 2 3.5-3.5" /></Base>
-)

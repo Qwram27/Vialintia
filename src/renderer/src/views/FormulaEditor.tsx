@@ -17,7 +17,7 @@ import { Sheet } from '@/components/Sheet'
 import { useIsMobile } from '@/lib/useMobile'
 import {
   IconAlert, IconCheck, IconCompare, IconCopy, IconDownload, IconFile, IconGrip, IconPlus,
-  IconChevron, IconRedo, IconSort, IconTrash, IconUndo, IconX
+  IconRedo, IconSort, IconTrash, IconUndo, IconX
 } from '@/components/Icons'
 
 const STATUS_LABEL: Record<FormulaStatus, string> = { draft: 'Draft', testing: 'Testing', final: 'Final' }
@@ -1174,14 +1174,10 @@ function Collapsible({
         <span className="t">{title}</span>
         {meta != null && <span className="m">{meta}</span>}
         <span className="chev" aria-hidden>
-          <IconChevron size={16} />
+          {open ? '−' : '+'}
         </span>
       </button>
-      <div className="m-block-collapse" aria-hidden={!open}>
-        <div className="m-block-inner">
-          <div className="m-block-body insp">{children}</div>
-        </div>
-      </div>
+      {open && <div className="m-block-body insp">{children}</div>}
     </div>
   )
 }
