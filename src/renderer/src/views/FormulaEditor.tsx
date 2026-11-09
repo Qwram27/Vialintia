@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
 import type { AmountUnit, Formula, FormulaRow, FormulaStatus, Material, ProductType, Settings, TestNote, TestPhase, TestStage } from '@shared/types'
 import { NOTE_LABELS, NOTE_ORDER, PRODUCT_PRESETS } from '@shared/defaults'
 import { currentVersion, familyById, useMaterialMap, useStore, withRows } from '@/store/store'
@@ -14,10 +13,11 @@ import { EvolutionChart, FamilyDonut, NoteBar, StructureChart } from '@/componen
 import { Seg } from '@/components/Seg'
 import { catalogNo, seasonCode, shortDate } from '@/lib/archive'
 import { Stars } from '@/components/Overlays'
+import { Sheet } from '@/components/Sheet'
 import { useIsMobile } from '@/lib/useMobile'
 import {
   IconAlert, IconCheck, IconCompare, IconCopy, IconDownload, IconFile, IconGrip, IconPlus,
-  IconRedo, IconSort, IconTrash, IconUndo, IconX
+  IconChevron, IconRedo, IconSort, IconTrash, IconUndo, IconX
 } from '@/components/Icons'
 
 const STATUS_LABEL: Record<FormulaStatus, string> = { draft: 'Draft', testing: 'Testing', final: 'Final' }
@@ -812,28 +812,6 @@ function MobileComposition({
   )
 }
 
-/** Bottom sheet (phone). */
-function Sheet({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
-  return createPortal(
-    <div className="overlay sheet-overlay" onClick={onClose}>
-      <div className="sheet" onClick={(e) => e.stopPropagation()} role="dialog" aria-label={title}>
-        <div className="sheet-grab" />
-        <div className="row mb">
-          <span className="page-kicker" style={{ margin: 0 }}>
-            {title}
-          </span>
-          <div className="spacer" />
-          <button className="btn btn-ghost btn-icon" onClick={onClose} title="Close">
-            <IconX />
-          </button>
-        </div>
-        <div className="sheet-body">{children}</div>
-      </div>
-    </div>,
-    document.body
-  )
-}
-
 // ---------------------------------------------------------------- metrics strip
 function Metrics({ formula, calc, settings }: { formula: Formula; calc: FormulaCalc; settings: Settings }) {
   const b = calc.batch
@@ -1196,10 +1174,14 @@ function Collapsible({
         <span className="t">{title}</span>
         {meta != null && <span className="m">{meta}</span>}
         <span className="chev" aria-hidden>
-          {open ? '−' : '+'}
+          <IconChevron size={16} />
         </span>
       </button>
-      {open && <div className="m-block-body insp fade-in">{children}</div>}
+      <div className="m-block-collapse" aria-hidden={!open}>
+        <div className="m-block-inner">
+          <div className="m-block-body insp">{children}</div>
+        </div>
+      </div>
     </div>
   )
 }

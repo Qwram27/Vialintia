@@ -15,4 +15,16 @@ if (isWeb) {
   }
 }
 
+// Visible viewport (shrinks when the iOS keyboard is open) → CSS vars for full-height sheets.
+const vv = window.visualViewport
+const syncViewport = () => {
+  const st = document.documentElement.style
+  st.setProperty('--vvh', `${vv ? vv.height : window.innerHeight}px`)
+  st.setProperty('--vvt', `${vv ? vv.offsetTop : 0}px`)
+}
+syncViewport()
+vv?.addEventListener('resize', syncViewport)
+vv?.addEventListener('scroll', syncViewport)
+window.addEventListener('resize', syncViewport)
+
 createRoot(document.getElementById('root')!).render(<App />)

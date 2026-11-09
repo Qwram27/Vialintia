@@ -297,7 +297,7 @@ const timers: Partial<Record<keyof AppData, ReturnType<typeof setTimeout>>> = {}
 const pending: Partial<Record<keyof AppData, unknown>> = {}
 
 /** Tiny store for the "saving / saved" indicator. */
-export const useSaveState = create<{ saving: boolean }>(() => ({ saving: false }))
+export const useSaveState = create<{ saving: boolean; error: boolean }>(() => ({ saving: false, error: false }))
 let inflight = 0
 
 function schedule(key: keyof AppData, value: unknown) {
@@ -315,7 +315,11 @@ function flush(key: keyof AppData) {
   inflight++
   window.vialintia
     .save(key, value)
-    .catch((err) => console.error('Save failed', err))
+    .then(() => useSaveState.setState({ error: false }))
+    .catch((err) => {
+      console.error('Save failed', err)
+      useSaveState.setState({ error: true })
+    })
     .finally(() => {
       inflight--
       if (inflight === 0 && Object.keys(pending).length === 0) setTimeout(() => useSaveState.setState({ saving: false }), 350)

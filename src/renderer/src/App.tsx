@@ -9,12 +9,13 @@ import { Compare } from '@/views/Compare'
 import { SettingsView } from '@/views/Settings'
 import { ConfirmHost, ToastHost } from '@/components/Overlays'
 import { useIsMobile } from '@/lib/useMobile'
+import { IconCompare, IconFlask, IconSettings, IconVial } from '@/components/Icons'
 
 const NAV = [
-  { key: 'dashboard', label: 'Formulas', path: '/' },
-  { key: 'library', label: 'Materials', path: '/library' },
-  { key: 'compare', label: 'Compare', path: '/compare' },
-  { key: 'settings', label: 'Settings', path: '/settings' }
+  { key: 'dashboard', label: 'Formulas', path: '/', Icon: IconFlask },
+  { key: 'library', label: 'Materials', path: '/library', Icon: IconVial },
+  { key: 'compare', label: 'Compare', path: '/compare', Icon: IconCompare },
+  { key: 'settings', label: 'Settings', path: '/settings', Icon: IconSettings }
 ] as const
 
 export function App() {
@@ -89,7 +90,7 @@ export function App() {
           )}
           <div className="sidebar-foot">
             <span>Offline</span>
-            <span>v1.4.1</span>
+            <span>v1.4.2</span>
           </div>
         </aside>
       )}
@@ -102,11 +103,20 @@ export function App() {
         {route.name === 'settings' && <SettingsView />}
       </main>
       {mobile && (
-        <nav className="tabbar" aria-label="Sections">
+        <nav className="tabbar" aria-label="Sections" style={{ '--tab': Math.max(0, NAV.findIndex((n) => n.key === active)) } as React.CSSProperties}>
+          <span className="tab-thumb" aria-hidden />
           {NAV.map((n, i) => (
-            <button key={n.key} className={`tab-item${active === n.key ? ' active' : ''}`} onClick={() => navigate(n.path)}>
-              <span className="idx">{String(i + 1).padStart(2, '0')}</span>
-              <span className="lbl">{n.label}</span>
+            <button
+              key={n.key}
+              className={`tab-item${active === n.key ? ' active' : ''}`}
+              aria-current={active === n.key ? 'page' : undefined}
+              onClick={() => navigate(n.path)}
+            >
+              <n.Icon size={21} />
+              <span className="lbl">
+                <span className="idx">{String(i + 1).padStart(2, '0')}</span>
+                {n.label}
+              </span>
             </button>
           ))}
         </nav>
@@ -120,6 +130,7 @@ export function App() {
 function TopBar({ route, scrolled }: { route: Route; scrolled: boolean }) {
   const formulas = useStore((s) => s.formulas)
   const saving = useSaveState((s) => s.saving)
+  const error = useSaveState((s) => s.error)
   const formula = route.name === 'formula' ? formulas.find((f) => f.id === route.id) : undefined
   const idx = NAV.findIndex((n) => n.key === (route.name === 'formula' ? 'dashboard' : route.name))
   const section = NAV[idx]
@@ -145,9 +156,11 @@ function TopBar({ route, scrolled }: { route: Route; scrolled: boolean }) {
           </span>
         )}
       </div>
-      <div className={`savestate${saving ? ' saving' : ''}`}>
+      <div className={`savestate ${error ? 'error' : saving ? 'saving' : 'saved'}`} role="status" aria-live="polite">
         <i />
-        {saving ? 'Saving' : 'Saved'}
+        <span key={error ? 'e' : saving ? 's' : 'd'} className="savestate-label">
+          {error ? 'Not saved' : saving ? 'Saving' : 'Saved'}
+        </span>
       </div>
     </div>
   )
