@@ -85,6 +85,8 @@ function normalizeFormula(f: Formula): Formula {
       const m = /^mod\s*(\d+)$/i.exec(v.label.trim())
       return m ? { ...v, label: `V${m[1]}` } : v
     }),
+    // "Draft" status was removed — it meant the same as "Testing".
+    status: f.status === 'final' ? 'final' : 'testing',
     tags: f.tags ?? [],
     notes: f.notes ?? [],
     assemblies: f.assemblies ?? [],
@@ -112,7 +114,7 @@ export function newFormula(name = 'Untitled formula'): Formula {
     name,
     description: '',
     tags: [],
-    status: 'draft',
+    status: 'testing',
     unit: 'g',
     productType: 'edp',
     concentration: PRODUCT_PRESETS.edp.concentration,
@@ -255,7 +257,7 @@ export const useStore = create<State>((set, get) => ({
       versions,
       currentVersionId: idMap.get(src.currentVersionId) ?? versions[0].id,
       notes: src.notes.map((n) => ({ ...n, id: uid(), versionId: idMap.get(n.versionId) ?? n.versionId })),
-      status: 'draft',
+      status: 'testing',
       createdAt: now(),
       updatedAt: now()
     }

@@ -22,7 +22,7 @@ const formula = (extra: Partial<Formula> = {}): Formula => ({
   name: 'Test',
   description: '',
   tags: [],
-  status: 'draft',
+  status: 'testing',
   unit: 'g',
   productType: 'edp',
   concentration: 20,
