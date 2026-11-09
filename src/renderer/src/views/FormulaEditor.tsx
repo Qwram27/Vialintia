@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import type { AmountUnit, Formula, FormulaRow, FormulaStatus, Material, ProductType, Settings, TestNote, TestPhase, TestStage } from '@shared/types'
 import { NOTE_LABELS, NOTE_ORDER, PRODUCT_PRESETS } from '@shared/defaults'
-import { currentVersion, useMaterialMap, useStore, withRows } from '@/store/store'
+import { currentVersion, familyById, useMaterialMap, useStore, withRows } from '@/store/store'
 import { confirmDialog, navigate, toast } from '@/store/ui'
 import { computeFormula, fmt, fmtSmart, inkOn, type FormulaCalc } from '@/lib/calc'
 import { formulaToCsv, formulaToPdfHtml } from '@/lib/exports'
@@ -13,6 +14,7 @@ import { EvolutionChart, FamilyDonut, NoteBar, StructureChart } from '@/componen
 import { Seg } from '@/components/Seg'
 import { catalogNo, seasonCode, shortDate } from '@/lib/archive'
 import { Stars } from '@/components/Overlays'
+import { useIsMobile } from '@/lib/useMobile'
 import {
   IconAlert, IconCheck, IconCompare, IconCopy, IconDownload, IconFile, IconGrip, IconPlus,
   IconRedo, IconSort, IconTrash, IconUndo, IconX
@@ -30,6 +32,7 @@ export function FormulaEditor({ id }: { id: string }) {
   const redo = useStore((s) => s.redo)
   const materials = useMaterialMap()
   const [tab, setTab] = useState<'composition' | 'notes' | 'details'>('composition')
+  const mobile = useIsMobile()
 
   const version = formula ? currentVersion(formula) : null
   const calc = useMemo(
@@ -73,7 +76,7 @@ export function FormulaEditor({ id }: { id: string }) {
   const setRows = (rows: FormulaRow[]) => update((f) => withRows(f, rows))
 
   return (
-    <div className="page page-wide editor-page">
+    <div className={`page page-wide editor-page${mobile ? ' m-editor' : ''}`}>
       <Header formula={formula} update={update} calc={calc} versionLabel={version.label} canUndo={!!history?.past.length} canRedo={!!history?.future.length} onUndo={() => undo(id)} onRedo={() => redo(id)} settings={settings}>
         <Versions formula={formula} update={update} />
       </Header>
@@ -87,22 +90,25 @@ export function FormulaEditor({ id }: { id: string }) {
               value={tab}
               onChange={setTab}
               options={[
-                { value: 'composition', label: <>Composition<span className="count">{String(version.rows.length).padStart(2, '0')}</span></> },
-                { value: 'notes', label: <>Test notes<span className="count">{String(formula.notes.length).padStart(2, '0')}</span></> },
+                { value: 'composition', label: <>{mobile ? 'Formula' : 'Composition'}<span className="count">{String(version.rows.length).padStart(2, '0')}</span></> },
+                { value: 'notes', label: <>{mobile ? 'Notes' : 'Test notes'}<span className="count">{String(formula.notes.length).padStart(2, '0')}</span></> },
                 { value: 'details', label: 'Details' }
               ]}
             />
           </div>
           <div className="pane-body">
-            {tab === 'composition' && (
-              <Composition formula={formula} rows={version.rows} calc={calc} setRows={setRows} update={update} settings={settings} />
-            )}
+            {tab === 'composition' &&
+              (mobile ? (
+                <MobileComposition formula={formula} rows={version.rows} calc={calc} setRows={setRows} update={update} settings={settings} />
+              ) : (
+                <Composition formula={formula} rows={version.rows} calc={calc} setRows={setRows} update={update} settings={settings} />
+              ))}
             {tab === 'notes' && <Notes formula={formula} update={update} />}
             {tab === 'details' && <Details formula={formula} update={update} />}
           </div>
         </div>
 
-        <Inspector formula={formula} calc={calc} update={update} settings={settings} />
+        <Inspector formula={formula} calc={calc} update={update} settings={settings} mobile={mobile} />
       </div>
     </div>
   )
@@ -581,6 +587,253 @@ function Composition({
   )
 }
 
+// ---------------------------------------------------------------- composition (phone)
+function MobileComposition({
+  formula, rows, calc, setRows, update, settings
+}: {
+  formula: Formula
+  rows: FormulaRow[]
+  calc: FormulaCalc
+  setRows: (rows: FormulaRow[]) => void
+  update: (fn: (f: Formula) => Formula, history?: boolean) => void
+  settings: Settings
+}) {
+  const [adding, setAdding] = useState(false)
+  const [editId, setEditId] = useState<string | null>(null)
+  const showBatch = calc.batch.concentrateG > 0
+  const unit = UNIT_LABEL[formula.unit]
+
+  const patchRow = (rid: string, patch: Partial<FormulaRow>) => setRows(rows.map((r) => (r.id === rid ? { ...r, ...patch } : r)))
+
+  const addMaterial = (m: Material) => {
+    const row: FormulaRow = { id: uid(), materialId: m.id, amount: 0, dilution: m.defaultDilution ?? 100, solvent: m.solvent ?? (m.defaultDilution < 100 ? 'DPG' : undefined) }
+    setRows([...rows, row])
+    setEditId(row.id)
+  }
+
+  const sortByNote = () => {
+    const rank = (r: FormulaRow) => {
+      const m = calc.rows.find((c) => c.row.id === r.id)?.material
+      return m ? NOTE_ORDER.indexOf(m.note) : 3
+    }
+    const grams = new Map(calc.rows.map((c) => [c.row.id, c.neatGrams]))
+    setRows([...rows].sort((a, b) => rank(a) - rank(b) || (grams.get(b.id) ?? 0) - (grams.get(a.id) ?? 0)))
+  }
+
+  const move = (rid: string, dir: -1 | 1) => {
+    const i = rows.findIndex((r) => r.id === rid)
+    const j = i + dir
+    if (i < 0 || j < 0 || j >= rows.length) return
+    const next = [...rows]
+    ;[next[i], next[j]] = [next[j], next[i]]
+    setRows(next)
+  }
+
+  const editing = calc.rows.find((r) => r.row.id === editId)
+  const editIdx = editing ? calc.rows.indexOf(editing) : -1
+
+  return (
+    <>
+      <div className="row mb m-comp-tools">
+        <Seg
+          value={formula.unit}
+          onChange={(u) => update((f) => ({ ...f, unit: u }))}
+          options={(['g', 'drops', 'parts'] as const).map((u) => ({ value: u, label: UNIT_LABEL[u] }))}
+        />
+        <div className="spacer" />
+        <button className="btn btn-ghost btn-sm" onClick={sortByNote} disabled={rows.length < 2}>
+          <IconSort size={14} /> Sort
+        </button>
+      </div>
+
+      <div className="m-rows">
+        {calc.rows.map((r, idx) => {
+          const m = r.material
+          const entry = m ? calc.ifra.byMaterial.get(m.id) : undefined
+          return (
+            <button key={r.row.id} className={`m-row${entry?.status === 'over' ? ' over' : ''}`} onClick={() => setEditId(r.row.id)}>
+              <span className="m-row-no">{String(idx + 1).padStart(2, '0')}</span>
+              <span className="m-row-main">
+                <span className="m-row-name">
+                  {m ? (
+                    <>
+                      <span className="dot" style={{ background: familyById(settings, m.family).color }} />
+                      <span className="nm">{m.name}</span>
+                    </>
+                  ) : (
+                    <span className="missing">Missing material</span>
+                  )}
+                </span>
+                <span className="m-row-meta">
+                  {m && (
+                    <span className="note-pill" style={{ background: settings.noteColors[m.note], color: inkOn(settings.noteColors[m.note]) }}>
+                      {NOTE_LABELS[m.note].slice(0, 1)}
+                    </span>
+                  )}
+                  <span>{r.row.dilution < 100 ? `${fmtSmart(r.row.dilution)}%${r.row.solvent ? ` ${r.row.solvent}` : ''}` : 'neat'}</span>
+                  <span>·</span>
+                  <span>{fmtSmart(r.productPct)}% prod.</span>
+                  {showBatch && (
+                    <>
+                      <span>·</span>
+                      <span>{fmtSmart(r.batchGrams)} g batch</span>
+                    </>
+                  )}
+                </span>
+              </span>
+              <span className="m-row-amt">
+                <span className="v">{fmtSmart(r.row.amount)}</span>
+                <span className="u">{unit}</span>
+                <IfraBadge entry={entry} />
+              </span>
+            </button>
+          )
+        })}
+      </div>
+
+      {rows.length > 0 && (
+        <div className="m-total">
+          <span>Total</span>
+          <span>
+            {fmtSmart(rows.reduce((s, r) => s + (r.amount || 0), 0))} {unit}
+            {formula.unit !== 'g' ? ` · ${fmtSmart(calc.totalGrams)} g` : ''}
+          </span>
+          <span className="faint">{fmt(formula.concentration, 2)}% in product</span>
+        </div>
+      )}
+
+      <div className="add-row">
+        {adding ? (
+          <MaterialPicker
+            autoOpen
+            onPick={(m) => {
+              addMaterial(m)
+              setAdding(false)
+            }}
+            onClose={() => setAdding(false)}
+          />
+        ) : (
+          <button className="btn btn-block" onClick={() => setAdding(true)}>
+            <IconPlus size={14} /> Add material
+          </button>
+        )}
+      </div>
+      {rows.length === 0 && !adding && (
+        <div className="empty" style={{ padding: '30px 20px' }}>
+          <div className="mark">00</div>
+          <h3>No materials</h3>
+          <p>Add the first material to start the composition.</p>
+        </div>
+      )}
+
+      {editing && (
+        <Sheet onClose={() => setEditId(null)} title={`N°${String(editIdx + 1).padStart(2, '0')} · Row`}>
+          <div className="field">
+            <label>Material</label>
+            <MaterialPicker
+              material={editing.material}
+              missing={!editing.material}
+              onPick={(nm) => patchRow(editing.row.id, { materialId: nm.id, dilution: nm.defaultDilution ?? 100, solvent: nm.solvent ?? editing.row.solvent })}
+            />
+          </div>
+          <div className="grid-2">
+            <div className="field">
+              <label>Amount</label>
+              <div className="suffix">
+                <NumberInput value={editing.row.amount} min={0} onCommit={(v) => patchRow(editing.row.id, { amount: v ?? 0 })} />
+                <span>{unit}</span>
+              </div>
+            </div>
+            <div className="field">
+              <label>Dilution</label>
+              <div className="suffix">
+                <NumberInput value={editing.row.dilution} min={0.0001} max={100} onCommit={(v) => patchRow(editing.row.id, { dilution: v ?? 100 })} />
+                <span>%</span>
+              </div>
+            </div>
+          </div>
+          {editing.row.dilution < 100 && (
+            <div className="field">
+              <label>Solvent</label>
+              <select className="select" value={editing.row.solvent ?? ''} onChange={(e) => patchRow(editing.row.id, { solvent: e.target.value || undefined })}>
+                <option value="">—</option>
+                {settings.solvents.map((sv) => (
+                  <option key={sv} value={sv}>
+                    {sv}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+          <div className="m-sheet-stats">
+            <div>
+              <span className="k">Weighed</span>
+              <span className="v">{fmt(editing.weighedPct, 2)}%</span>
+            </div>
+            <div>
+              <span className="k">In product</span>
+              <span className="v">{fmtSmart(editing.productPct)}%</span>
+            </div>
+            <div>
+              <span className="k">Batch</span>
+              <span className="v">{showBatch ? `${fmtSmart(editing.batchGrams)} g` : '—'}</span>
+            </div>
+            <div>
+              <span className="k">IFRA</span>
+              <span className="v">
+                <IfraBadge entry={editing.material ? calc.ifra.byMaterial.get(editing.material.id) : undefined} />
+              </span>
+            </div>
+          </div>
+          <div className="row m-sheet-actions">
+            <button className="btn btn-icon" title="Move up" disabled={editIdx <= 0} onClick={() => move(editing.row.id, -1)}>
+              ↑
+            </button>
+            <button className="btn btn-icon" title="Move down" disabled={editIdx >= rows.length - 1} onClick={() => move(editing.row.id, 1)}>
+              ↓
+            </button>
+            <div className="spacer" />
+            <button
+              className="btn btn-danger"
+              onClick={() => {
+                setRows(rows.filter((x) => x.id !== editing.row.id))
+                setEditId(null)
+              }}
+            >
+              <IconTrash size={14} /> Remove
+            </button>
+            <button className="btn btn-primary" onClick={() => setEditId(null)}>
+              Done
+            </button>
+          </div>
+        </Sheet>
+      )}
+    </>
+  )
+}
+
+/** Bottom sheet (phone). */
+function Sheet({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+  return createPortal(
+    <div className="overlay sheet-overlay" onClick={onClose}>
+      <div className="sheet" onClick={(e) => e.stopPropagation()} role="dialog" aria-label={title}>
+        <div className="sheet-grab" />
+        <div className="row mb">
+          <span className="page-kicker" style={{ margin: 0 }}>
+            {title}
+          </span>
+          <div className="spacer" />
+          <button className="btn btn-ghost btn-icon" onClick={onClose} title="Close">
+            <IconX />
+          </button>
+        </div>
+        <div className="sheet-body">{children}</div>
+      </div>
+    </div>,
+    document.body
+  )
+}
+
 // ---------------------------------------------------------------- metrics strip
 function Metrics({ formula, calc, settings }: { formula: Formula; calc: FormulaCalc; settings: Settings }) {
   const b = calc.batch
@@ -655,8 +908,9 @@ function Metrics({ formula, calc, settings }: { formula: Formula; calc: FormulaC
 
 // ---------------------------------------------------------------- inspector
 function Inspector({
-  formula, calc, update, settings
+  formula, calc, update, settings, mobile
 }: {
+  mobile?: boolean
   formula: Formula
   calc: FormulaCalc
   update: (fn: (f: Formula) => Formula, history?: boolean) => void
@@ -670,23 +924,8 @@ function Inspector({
   const cur = settings.currency
   const setBatch = (patch: Partial<Formula['batch']>) => update((f) => ({ ...f, batch: { ...f.batch, ...patch } }))
 
-  return (
-    <div className="card pane">
-      <div className="pane-head">
-        <Seg
-          block
-          value={tab}
-          onChange={setTab}
-          options={[
-            { value: 'setup', label: 'Setup' },
-            { value: 'ifra', label: <>IFRA{over ? <span className="tab-alert">!</span> : null}</> },
-            { value: 'analysis', label: 'Analysis' }
-          ]}
-        />
-      </div>
-      <div className="pane-body" key={tab}>
-        {tab === 'setup' && (
-          <div className="insp fade-in">
+  const setupPanel = (
+    <>
       <section className="insp-sec">
         <h3 className="card-title">
           Product <small>{fmt(formula.concentration, 1)}% concentrate</small>
@@ -819,10 +1058,10 @@ function Inspector({
                 </div>
               </section>
             )}
-          </div>
-        )}
-        {tab === 'ifra' && (
-          <div className="insp fade-in">
+    </>
+  )
+  const ifraPanel = (
+    <>
       <section className="insp-sec">
         <h3 className="card-title">
           IFRA <small>Category 4</small>
@@ -880,10 +1119,10 @@ function Inspector({
         )}
         <div className="faint small mt">Uses the limits you enter per material — verify against the current IFRA Standards.</div>
       </section>
-          </div>
-        )}
-        {tab === 'analysis' && (
-          <div className="insp fade-in">
+    </>
+  )
+  const analysisPanel = (
+    <>
             <section className="insp-sec">
               <h3 className="card-title">Structure</h3>
               <StructureChart byNote={calc.byNote} settings={settings} />
@@ -896,9 +1135,71 @@ function Inspector({
               <h3 className="card-title">Evolution</h3>
               <EvolutionChart rows={calc.rows} settings={settings} />
             </section>
-          </div>
-        )}
+    </>
+  )
+
+  if (mobile) {
+    return (
+      <div className="m-insp">
+        <Collapsible title="Setup" meta={`${fmt(formula.concentration, 1)}% · ${fmt(b.concentrateG, 2)} g`} defaultOpen>
+          {setupPanel}
+        </Collapsible>
+        <Collapsible
+          title="IFRA"
+          meta={ifra.entries.length === 0 ? '—' : over ? `! ${over} over` : near ? `◐ ${near} near` : '✓ ok'}
+          alert={over > 0}
+          defaultOpen={over > 0}
+        >
+          {ifraPanel}
+        </Collapsible>
+        <Collapsible title="Analysis">{analysisPanel}</Collapsible>
       </div>
+    )
+  }
+
+  return (
+    <div className="card pane">
+      <div className="pane-head">
+        <Seg
+          block
+          value={tab}
+          onChange={setTab}
+          options={[
+            { value: 'setup', label: 'Setup' },
+            { value: 'ifra', label: <>IFRA{over ? <span className="tab-alert">!</span> : null}</> },
+            { value: 'analysis', label: 'Analysis' }
+          ]}
+        />
+      </div>
+      <div className="pane-body" key={tab}>
+        <div className="insp fade-in">
+          {tab === 'setup' ? setupPanel : tab === 'ifra' ? ifraPanel : analysisPanel}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function Collapsible({
+  title, meta, alert, defaultOpen, children
+}: {
+  title: string
+  meta?: React.ReactNode
+  alert?: boolean
+  defaultOpen?: boolean
+  children: React.ReactNode
+}) {
+  const [open, setOpen] = useState(!!defaultOpen)
+  return (
+    <div className={`card m-block${open ? ' open' : ''}${alert ? ' alert' : ''}`}>
+      <button className="m-block-head" onClick={() => setOpen((o) => !o)} aria-expanded={open}>
+        <span className="t">{title}</span>
+        {meta != null && <span className="m">{meta}</span>}
+        <span className="chev" aria-hidden>
+          {open ? '−' : '+'}
+        </span>
+      </button>
+      {open && <div className="m-block-body insp fade-in">{children}</div>}
     </div>
   )
 }

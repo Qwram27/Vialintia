@@ -21,14 +21,12 @@ Offline fine-fragrance formulation app (Electron + React + TypeScript, electron-
 - `src/main` — window (hidden title bar + overlay), JSON storage in `%APPDATA%/Vialintia/data` with atomic writes + startup backups, PDF via hidden window.
 - `src/preload` — exposes `window.vialintia` (`StoreApi` in `src/shared/types.ts`).
 - `src/renderer/src` — React app. `store/store.ts` (zustand, debounced persistence, undo/redo, data migrations in `normalizeSettings`/`normalizeFormula`), `store/ui.ts` (hash router, toasts, confirm), `views/` (Dashboard grid/index, FormulaEditor = metrics strip + composition pane + inspector tabs, Library, Compare, Settings), `components/Seg.tsx` (sliding segmented control).
-- Releases so far: 1.0 botanical → 1.1 archive → 1.2 workspace layout → 1.3 liquid glass/squarer → 1.3.1 mono IFRA + classic PDF.
+- Releases so far: 1.0 botanical → 1.1 archive → 1.2 workspace layout → 1.3 liquid glass/squarer → 1.3.1 mono IFRA + classic PDF → 1.4 iPhone web app (PWA).
 
-## NEXT TASK — iPhone web app (PWA) on GitHub Pages
-Owner wants to use Vialintia on iPhone, offline, added to the Home Screen. Agreed plan:
-1. Web build target of the same renderer (e.g. separate Vite config, base path for Pages `/vialintia/` or repo name).
-2. Implement `StoreApi` for the browser: IndexedDB (or localStorage) for materials/formulas/settings; export = file download (Blob), import = `<input type=file>`; PDF = open sheet HTML in a new window/iframe and `print()` (iOS share → Save to Files). Pick implementation at runtime (`window.vialintia` exists → Electron, else web).
-3. PWA: `manifest.webmanifest` (name, icons from `build/icon.svg`, `display: standalone`, black theme), service worker for offline cache, `apple-mobile-web-app-*` meta, safe-area insets.
-4. Mobile layout (≤ 700px): bottom tab bar instead of sidebar; formula composition as stacked row cards (material, amount, dilution, % in product, IFRA glyph) with an edit sheet; inspector sections become collapsible blocks below; metrics strip becomes a 2-column grid; touch targets ≥ 44px; keep the archive/liquid-glass look.
-5. Deploy with GitHub Actions → GitHub Pages (HTTPS is required for the service worker on iOS). Repo owner: `Qwram27`.
-6. Data sync between PC and phone = Settings → Export backup / Restore backup (JSON), already implemented.
-Keep the Electron app working; run `npm test` and `npm run typecheck` after changes.
+## iPhone web app (PWA) — done in 1.4
+- `npm run dev:web` / `build:web` (→ `dist-web/`) / `preview:web`, config `vite.web.config.mts` (relative base `./`, injects PWA head tags, generates `sw.js` precaching every built file; navigation = network-first, assets = cache-first).
+- `src/renderer/src/platform/` — `installPlatform()` sets `window.vialintia = createWebApi()` when no Electron preload; `isWeb` flag. Web API: IndexedDB (localStorage fallback), export = iOS share sheet / download, import = `<input type=file>`, PDF = sheet mounted in `#print-root` (print-only CSS) + `window.print()`.
+- PWA assets in `src/renderer/web-public/` (manifest, icons rendered from `icons/icon.svg`).
+- Phone layout ≤ 700px (`lib/useMobile.ts`): bottom `.tabbar`, `MobileComposition` row cards + bottom `Sheet` editor, inspector as `Collapsible` blocks, Library list + material sheet. CSS at the end of `theme.css` (safe-area vars `--sat/--sab`).
+- Deploy: `.github/workflows/pages.yml` → GitHub Pages on push to `main` (Pages source must be "GitHub Actions").
+- Sync PC ↔ phone = Settings → Export / Restore backup (JSON).
