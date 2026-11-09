@@ -143,6 +143,9 @@ export function formulaToPdfHtml(formula: Formula, versionLabel: string, calc: F
   @page { size: A4; }
   * { box-sizing: border-box; }
   body { font-family: Arial, 'Segoe UI', Helvetica, sans-serif; color: #000; font-size: 9.5pt; margin: 0; }
+  .brand { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+  .brand svg { width: 18px; height: 25px; flex: none; }
+  .brand span { font-size: 10.5pt; font-weight: bold; letter-spacing: .42em; color: #000; }
   .head { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 2px solid #000; padding-bottom: 8px; margin-bottom: 12px; }
   .doc { font-size: 8pt; text-transform: uppercase; letter-spacing: .08em; color: #444; margin-bottom: 4px; }
   h1 { font-size: 20pt; margin: 0; font-weight: bold; }
@@ -172,6 +175,15 @@ export function formulaToPdfHtml(formula: Formula, versionLabel: string, calc: F
   .sign div { flex: 1; border-top: 1px solid #000; padding-top: 4px; color: #444; }
   .foot { margin-top: 18px; font-size: 7pt; color: #666; display: flex; justify-content: space-between; }
 </style></head><body>
+  <div class="brand">
+    <svg viewBox="132 76 256 360" xmlns="http://www.w3.org/2000/svg" fill="none" stroke-linecap="square" stroke-linejoin="miter">
+      <path d="M138 88 H310 L374 152 V424 H138 Z" stroke="#000" stroke-width="18"/>
+      <path d="M310 88 V152 H374" stroke="#000" stroke-width="18"/>
+      <path d="M184 180 L230 300 L276 180" stroke="#000" stroke-width="28"/>
+      <path d="M184 352 H328 M184 386 H294" stroke="#777" stroke-width="18"/>
+    </svg>
+    <span>VIALINTIA</span>
+  </div>
   <div class="head">
     <div>
       <div class="doc">Formula sheet</div>

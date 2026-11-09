@@ -99,6 +99,7 @@ export default defineConfig({
       '@shared': resolve(__dirname, 'src/shared')
     }
   },
+  define: { __BUILD_TIME__: JSON.stringify(new Date().toISOString()) },
   plugins: [react(), pwa()],
   build: {
     outDir: resolve(__dirname, 'dist-web'),

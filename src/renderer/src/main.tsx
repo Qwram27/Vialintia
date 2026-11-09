@@ -2,6 +2,7 @@ import { createRoot } from 'react-dom/client'
 import '@fontsource-variable/geist-mono'
 import './styles/theme.css'
 import { installPlatform, isWeb } from './platform'
+import { flushAll } from './store/store'
 import { App } from './App'
 
 installPlatform()
@@ -9,8 +10,26 @@ installPlatform()
 if (isWeb) {
   document.documentElement.classList.add('is-web')
   if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+    // iOS keeps Home Screen apps alive in memory, so a reopen does not reload the page. Check for a
+    // new release whenever the app comes back to the foreground; when the new service worker takes
+    // over, save pending edits and reload once.
+    const hadController = !!navigator.serviceWorker.controller
+    let reloading = false
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (!hadController || reloading) return
+      reloading = true
+      flushAll()
+      setTimeout(() => location.reload(), 400)
+    })
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js').catch((err) => console.error('Service worker failed', err))
+      navigator.serviceWorker
+        .register('./sw.js')
+        .then((reg) => {
+          const check = () => reg.update().catch(() => undefined)
+          document.addEventListener('visibilitychange', () => document.visibilityState === 'visible' && check())
+          setInterval(check, 30 * 60 * 1000)
+        })
+        .catch((err) => console.error('Service worker failed', err))
     })
   }
 }
