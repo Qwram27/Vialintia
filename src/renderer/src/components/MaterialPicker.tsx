@@ -4,7 +4,6 @@ import type { Material } from '@shared/types'
 import { NOTE_LABELS } from '@shared/defaults'
 import { familyById, useStore } from '@/store/store'
 import { useIsMobile } from '@/lib/useMobile'
-import { IconSearch } from './Icons'
 
 interface Props {
   material?: Material
@@ -65,6 +64,15 @@ export function MaterialPicker({ material, missing, onPick, autoOpen, onClose }:
     document.addEventListener('pointerdown', onDown)
     return () => document.removeEventListener('pointerdown', onDown)
   })
+
+  // Phones: freeze the page behind the picker so a swipe scrolls only the material list.
+  useEffect(() => {
+    if (!open || !mobile) return
+    const scrollers = Array.from(document.querySelectorAll<HTMLElement>('.main, .sheet'))
+    const prev = scrollers.map((el) => el.style.overflow)
+    scrollers.forEach((el) => (el.style.overflow = 'hidden'))
+    return () => scrollers.forEach((el, i) => (el.style.overflow = prev[i]))
+  }, [open, mobile])
 
   useEffect(() => setHl(0), [q])
   useEffect(() => {
@@ -168,31 +176,10 @@ export function MaterialPicker({ material, missing, onPick, autoOpen, onClose }:
       </button>
       {open &&
         createPortal(
-          mobile ? (
-            // Phone: full-height sheet sized to the visible viewport (above the keyboard).
-            <div className="overlay picker-overlay">
-              <div ref={popRef} className="picker-sheet">
-                <div className="picker-sheet-head">
-                  <div className="search">
-                    <IconSearch />
-                    {search}
-                  </div>
-                  <button className="btn btn-ghost" onClick={close}>
-                    Cancel
-                  </button>
-                </div>
-                <div className="picker-count">
-                  {results.length >= 60 ? '60+' : String(results.length).padStart(2, '0')} {q.trim() ? 'matches' : 'materials'}
-                </div>
-                {list}
-              </div>
-            </div>
-          ) : (
-            <div ref={popRef} className="picker-pop fade-in" style={{ left: pos.left, top: pos.top }}>
-              {search}
-              {list}
-            </div>
-          ),
+          <div ref={popRef} className="picker-pop fade-in" style={{ left: pos.left, top: pos.top }}>
+            {search}
+            {list}
+          </div>,
           document.body
         )}
     </div>
