@@ -1,7 +1,7 @@
 export type NoteLevel = 'top' | 'heart' | 'base'
 export type MaterialType = 'natural' | 'synthetic' | 'base' | 'other'
 export type AmountUnit = 'g' | 'drops' | 'parts'
-export type FormulaStatus = 'draft' | 'testing' | 'final'
+export type FormulaStatus = 'testing' | 'final'
 export type ProductType = 'parfum' | 'edp' | 'edt' | 'edc' | 'custom'
 
 export interface Material {

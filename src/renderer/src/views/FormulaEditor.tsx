@@ -22,7 +22,7 @@ import {
   IconRedo, IconSort, IconTrash, IconUndo, IconX
 } from '@/components/Icons'
 
-const STATUS_LABEL: Record<FormulaStatus, string> = { draft: 'Draft', testing: 'Testing', final: 'Final' }
+const STATUS_LABEL: Record<FormulaStatus, string> = { testing: 'Testing', final: 'Final' }
 const UNIT_LABEL: Record<AmountUnit, string> = { g: 'g', drops: 'drops', parts: 'parts' }
 
 export function FormulaEditor({ id }: { id: string }) {
@@ -337,7 +337,7 @@ function Header({
           <Seg
             value={formula.status}
             onChange={(v) => update((f) => ({ ...f, status: v }))}
-            options={(['draft', 'testing', 'final'] as const).map((s) => ({ value: s, label: STATUS_LABEL[s] }))}
+            options={(['testing', 'final'] as const).map((s) => ({ value: s, label: STATUS_LABEL[s] }))}
           />
           {formula.tags.map((t) => (
             <span key={t} className="tag">

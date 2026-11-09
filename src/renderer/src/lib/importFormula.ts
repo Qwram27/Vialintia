@@ -31,7 +31,7 @@ export function csvToFormula(text: string, fileName: string, settings: Settings)
   const now0 = new Date().toISOString()
   const vId = uid()
   const f: Formula = {
-    id: uid(), name, description: '', tags: [], status: 'draft', unit: 'g', productType: 'edp',
+    id: uid(), name, description: '', tags: [], status: 'testing', unit: 'g', productType: 'edp',
     concentration: PRODUCT_PRESETS.edp.concentration, batch: { mode: 'bottles', bottles: 1, bottleMl: 50, massG: 10 },
     versions: [{ id: vId, label: 'V1', createdAt: now0, rows: [] }], currentVersionId: vId, notes: [], assemblies: [],
     createdAt: now0, updatedAt: now0

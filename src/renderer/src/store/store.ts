@@ -88,6 +88,8 @@ function normalizeFormula(f: Formula): Formula {
     tags: f.tags ?? [],
     notes: f.notes ?? [],
     assemblies: f.assemblies ?? [],
+    // 'draft' was removed — earlier drafts are now 'testing'
+    status: (f.status as string) === 'final' ? 'final' : 'testing',
     description: f.description ?? '',
     batch: { ...{ mode: 'bottles' as const, bottles: 1, bottleMl: 50, massG: 10 }, ...(f.batch ?? {}) },
     currentVersionId: versions.some((v) => v.id === f.currentVersionId) ? f.currentVersionId : versions[versions.length - 1].id
@@ -112,7 +114,7 @@ export function newFormula(name = 'Untitled formula'): Formula {
     name,
     description: '',
     tags: [],
-    status: 'draft',
+    status: 'testing',
     unit: 'g',
     productType: 'edp',
     concentration: PRODUCT_PRESETS.edp.concentration,
@@ -255,7 +257,7 @@ export const useStore = create<State>((set, get) => ({
       versions,
       currentVersionId: idMap.get(src.currentVersionId) ?? versions[0].id,
       notes: src.notes.map((n) => ({ ...n, id: uid(), versionId: idMap.get(n.versionId) ?? n.versionId })),
-      status: 'draft',
+      status: 'testing',
       createdAt: now(),
       updatedAt: now()
     }

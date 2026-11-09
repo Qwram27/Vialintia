@@ -31,6 +31,7 @@ Offline fine-fragrance formulation app (Electron + React + TypeScript, electron-
 
 ## Formula tools
 - Confirm dialogs are portaled to `body` with `.confirm-overlay` (z 400) so they sit above sheets/pickers.
+- Formula status: only **Testing** and **Final** (owner removed Draft; `normalizeFormula` turns old drafts into testing; new formulas start as testing).
 - Product presets: EDT 10 %, EDP 17 % (owner), parfum 25 %, EDC 5 %.
 - Formula editor: no metrics strip (owner removed it — figures live in the inspector). Header has **Assemble fragrance** (text only, no icon) + undo/redo/duplicate/delete; the footer bar (`EditorFoot`) holds Scale (percent icon), Save as accord, Analyze, Export (single-formula JSON with `refMaterials`), CSV, PDF. Dashboard has **Import** (formula .json or formula .csv via `lib/importFormula.ts` `csvToFormula`, merged through `importData`).
 - PDF on the web/iPhone is a real file: `platform/web.ts` renders the sheet HTML in an off-screen frame → html2canvas → jsPDF (A4, dynamic imports), with the global progress bar (`withProgress` / `ProgressHost` in `store/ui.ts`); on touch devices a "PDF ready → Save PDF" confirm provides the fresh tap iOS needs for the share sheet. Desktop keeps Electron printToPDF (wrapped in the progress bar).
