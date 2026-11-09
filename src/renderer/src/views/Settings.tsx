@@ -2,7 +2,7 @@ import { isWeb } from '@/platform'
 import { Seg } from '@/components/Seg'
 import { APP_VERSION } from '@shared/version'
 import { useEffect, useState } from 'react'
-import type { AppData, NoteLevel } from '@shared/types'
+import type { AppData, Material, NoteLevel } from '@shared/types'
 import { DEFAULT_FAMILIES, DEFAULT_NOTE_COLORS, DEFAULT_SETTINGS, NOTE_LABELS, NOTE_ORDER } from '@shared/defaults'
 import { useStore } from '@/store/store'
 import { confirmDialog, toast } from '@/store/ui'
@@ -17,14 +17,14 @@ export function SettingsView() {
   const materials = useStore((s) => s.materials)
   const formulas = useStore((s) => s.formulas)
   const updateSettings = useStore((s) => s.updateSettings)
-  const replaceAll = useStore((s) => s.replaceAll)
+  const importData = useStore((s) => s.importData)
   const resetAll = useStore((s) => s.resetAll)
 
-  /** Restore a formulas, materials or settings export (or an old full backup) — only what the file contains is replaced. */
+  /** Import a formulas, materials or settings export (or an old full backup) — merged into what is here, nothing deleted. */
   async function restoreFromFile() {
     const text = await window.vialintia.importJson()
     if (!text) return
-    let data: Partial<AppData> & { seedVersion?: number; kind?: string }
+    let data: Partial<AppData> & { seedVersion?: number; kind?: string; refMaterials?: Material[] }
     try {
       data = JSON.parse(text)
     } catch {
@@ -39,11 +39,20 @@ export function SettingsView() {
       hasMaterials ? `${data.materials!.length} materials` : null,
       hasSettings ? 'settings' : null
     ].filter(Boolean)
-    const note = hasMaterials && !hasFormulas && formulas.length ? ' Formula rows whose material is not in the file will show as missing.' : ''
-    const ok = await confirmDialog('Restore from file?', `This replaces your current ${parts.join(', ')} with the ones in the file.${note}`, 'Restore')
+    const ok = await confirmDialog(
+      'Import from file?',
+      `Adds ${parts.join(', ')} from the file to this device. Nothing is deleted: formulas with the same id are updated when the file's copy is newer, materials are matched by name / CAS.${hasSettings ? ' Settings are replaced.' : ''}`,
+      'Import'
+    )
     if (!ok) return
-    replaceAll(data)
-    toast(`Restored ${parts.join(', ')}`)
+    const st = importData(data)
+    const bits = [
+      st.formulasAdded || st.formulasUpdated ? `${st.formulasAdded} formulas added, ${st.formulasUpdated} updated` : null,
+      st.materialsAdded || st.materialsUpdated ? `${st.materialsAdded} materials added, ${st.materialsUpdated} updated` : null,
+      st.missing ? `${st.missing} rows still missing a material` : null,
+      hasSettings ? 'settings restored' : null
+    ].filter(Boolean)
+    toast(bits.join(' · ') || 'Nothing new in the file')
   }
   const updateMaterial = useStore((s) => s.updateMaterial)
   const [newFamily, setNewFamily] = useState('')
@@ -248,7 +257,7 @@ export function SettingsView() {
             <h3 className="card-title">Data & backups</h3>
             <p className="muted small" style={{ marginTop: 0 }}>
               {isWeb
-                ? 'Everything is stored on this device, in the browser — no account, works offline. Use Export / Restore from file to move data between your computer and phone.'
+                ? 'Everything is stored on this device, in the browser — no account, works offline. Use Export / Import from file to move data between your computer and phone — importing adds to what is here, nothing is deleted.'
                 : 'Everything is stored locally on this computer — no account, no internet. A snapshot is taken automatically every time the app starts (last 10 kept).'}
             </p>
             <div className="small faint mb" style={{ wordBreak: 'break-all' }}>
@@ -259,7 +268,10 @@ export function SettingsView() {
                 className="btn"
                 onClick={async () => {
                   const stamp = new Date().toISOString().slice(0, 10)
-                  const file = { app: 'Vialintia', kind: 'formulas', version: 1, formulas }
+                  // carry the materials the formulas use, so another device can match them by name
+                  const used = new Set(formulas.flatMap((f) => f.versions.flatMap((v) => v.rows.map((r) => r.materialId))))
+                  const refMaterials = materials.filter((m) => used.has(m.id))
+                  const file = { app: 'Vialintia', kind: 'formulas', version: 2, formulas, refMaterials }
                   const p = await window.vialintia.exportJson(JSON.stringify(file, null, 2), `vialintia-formulas-${stamp}.json`)
                   if (p) toast('Formulas exported')
                 }}
@@ -289,7 +301,7 @@ export function SettingsView() {
                 <IconDownload /> Export settings
               </button>
               <button className="btn" onClick={restoreFromFile}>
-                <IconUpload /> Restore from file
+                <IconUpload /> Import from file
               </button>
               {!isWeb && (
                 <button className="btn btn-ghost" onClick={() => window.vialintia.openDataFolder()}>

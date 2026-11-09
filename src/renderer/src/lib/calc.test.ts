@@ -314,3 +314,61 @@ describe('scaling', () => {
     expect(out.map((r) => r.amount)).toEqual([5, 15])
   })
 })
+
+// ---------------------------------------------------------------- import merge
+import { mergeImport } from './merge'
+
+describe('import merge', () => {
+  const v = (rows: { id: string; materialId: string; amount: number; dilution: number }[]) => [{ id: 'v1', label: 'V1', createdAt: now, rows }]
+  const local = {
+    materials: [mat('L-hed', { name: 'Hedione' }), mat('L-iso', { name: 'Iso E Super', cas: '54464-57-2' })],
+    formulas: [formula({ id: 'keep', name: 'Mine', versions: v([{ id: 'r', materialId: 'L-hed', amount: 1, dilution: 100 }]), currentVersionId: 'v1' })]
+  }
+
+  it('adds imported formulas without deleting local ones and maps materials by name', () => {
+    const pcFormula = formula({ id: 'pc', name: 'From PC', versions: v([{ id: 'a', materialId: 'PC-hed', amount: 2, dilution: 100 }, { id: 'b', materialId: 'PC-new', amount: 1, dilution: 100 }]), currentVersionId: 'v1' })
+    const out = mergeImport(local, { formulas: [pcFormula], refMaterials: [mat('PC-hed', { name: 'hedione ' }), mat('PC-new', { name: 'Something new' })] })
+    expect(out.formulas.map((f) => f.id)).toEqual(['keep', 'pc'])
+    const rows = out.formulas[1].versions[0].rows
+    expect(rows[0].materialId).toBe('L-hed') // matched by name
+    expect(out.materials.some((m) => m.id === 'PC-new')).toBe(true) // unknown material added
+    expect(out.stats.missing).toBe(0)
+    expect(out.materials.find((m) => m.id === 'L-hed')!.aliasIds).toContain('PC-hed')
+  })
+
+  it('repairs rows of already-imported formulas when the materials file arrives later', () => {
+    const broken = formula({ id: 'old', versions: v([{ id: 'x', materialId: 'PC-iso', amount: 1, dilution: 100 }]), currentVersionId: 'v1' })
+    const out = mergeImport({ materials: local.materials, formulas: [broken] }, { materials: [mat('PC-iso', { name: 'Something else', cas: '54464-57-2', pricePerKg: 90 })] })
+    expect(out.formulas[0].versions[0].rows[0].materialId).toBe('L-iso') // matched by CAS
+    expect(out.materials.find((m) => m.id === 'L-iso')!.pricePerKg).toBe(90)
+    expect(out.materials).toHaveLength(2)
+  })
+
+  it('keeps the newer copy of a formula with the same id', () => {
+    const older = { ...local.formulas[0], name: 'Older', updatedAt: '2000-01-01T00:00:00Z' }
+    const out = mergeImport(local, { formulas: [older] })
+    expect(out.formulas[0].name).toBe('Mine')
+    expect(out.stats.formulasKept).toBe(1)
+  })
+})
+
+// ---------------------------------------------------------------- formula CSV import
+import { csvToFormula } from './importFormula'
+
+describe('formula CSV import', () => {
+  it('reads the formula CSV format written by the app', () => {
+    const csv = [
+      'Material,CAS,Family,Note,Amount (g),Dilution %,Solvent,Weighed %,Neat % in concentrate,% in product,IFRA limit %,Batch (g)',
+      'Hedione,24851-98-7,Floral,Heart,10,100,,83.3,83.3,14.2,,5.8',
+      'Citral,5392-40-5,Citrus,Top,2,10,EtOH,16.7,1.6,0.28,0.6,1.1',
+      '',
+      'Total,,,,12,,,100,,,,6.97',
+      'Concentration %,17'
+    ].join('\n')
+    const back = csvToFormula(csv, 'My scent - V1.csv', settings)!
+    expect(back.formula.name).toBe('My scent')
+    expect(back.formula.concentration).toBe(17)
+    expect(back.formula.versions[0].rows.map((r) => [r.amount, r.dilution, r.solvent])).toEqual([[10, 100, undefined], [2, 10, 'EtOH']])
+    expect(back.refMaterials.map((m) => [m.name, m.cas, m.note, m.family])).toEqual([['Hedione', '24851-98-7', 'heart', 'floral'], ['Citral', '5392-40-5', 'top', 'citrus']])
+  })
+})

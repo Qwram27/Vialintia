@@ -1,12 +1,13 @@
 import { useMemo, useState } from 'react'
 import type { FormulaStatus } from '@shared/types'
+import { csvToFormula } from '@/lib/importFormula'
 import { currentVersion, useAccordIndex, useMaterialMap, useStore } from '@/store/store'
 import { confirmDialog, navigate, toast } from '@/store/ui'
 import { computeFormula } from '@/lib/calc'
 import { catalogNo, seasonCode, shortDate } from '@/lib/archive'
 import { NoteBar } from '@/components/Charts'
 import { Seg } from '@/components/Seg'
-import { IconCopy, IconPlus, IconSearch, IconTrash } from '@/components/Icons'
+import { IconCopy, IconPlus, IconSearch, IconTrash, IconUpload } from '@/components/Icons'
 
 const STATUS_LABEL: Record<FormulaStatus, string> = { draft: 'Draft', testing: 'Testing', final: 'Final' }
 
@@ -68,6 +69,32 @@ export function Dashboard() {
     return c
   }, [formulas])
 
+  const importData = useStore((s) => s.importData)
+  const settingsAll = useStore((s) => s.settings)
+  /** Import one or more formulas: a Vialintia .json export or a formula .csv. Nothing is replaced. */
+  const importFormula = async () => {
+    const picked = await window.vialintia.importText('json,csv')
+    if (!picked) return
+    const text = picked
+    try {
+      if (text.trim().startsWith('{')) {
+        const data = JSON.parse(text)
+        if (!Array.isArray(data.formulas)) return toast('No formulas in that file')
+        const st = importData({ formulas: data.formulas, refMaterials: data.refMaterials ?? data.materials })
+        toast(`${st.formulasAdded} added, ${st.formulasUpdated} updated${st.missing ? ` · ${st.missing} rows missing a material` : ''}`)
+        if (data.formulas.length === 1) navigate(`/formula/${data.formulas[0].id}`)
+      } else {
+        const parsed = csvToFormula(text, 'Imported formula', settingsAll)
+        if (!parsed) return toast('That CSV is not a formula export')
+        importData({ formulas: [parsed.formula], refMaterials: parsed.refMaterials })
+        toast('Formula imported from CSV')
+        navigate(`/formula/${parsed.formula.id}`)
+      }
+    } catch {
+      toast('Could not read that file')
+    }
+  }
+
   const create = () => {
     const f = createFormula()
     navigate(`/formula/${f.id}`)
@@ -83,9 +110,14 @@ export function Dashboard() {
             {String(formulas.length).padStart(3, '0')} entries · {materials.size} materials
           </div>
         </div>
-        <button className="btn btn-primary" onClick={create}>
-          <IconPlus size={14} /> New formula
-        </button>
+        <div className="btn-group">
+          <button className="btn" onClick={importFormula} title="Import a formula (.json from Vialintia or a formula .csv)">
+            <IconUpload size={14} /> Import
+          </button>
+          <button className="btn btn-primary" onClick={create}>
+            <IconPlus size={14} /> New formula
+          </button>
+        </div>
       </div>
 
       {formulas.length === 0 ? (

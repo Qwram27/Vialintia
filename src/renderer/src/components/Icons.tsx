@@ -95,7 +95,7 @@ export const LogoMark = ({ size = 22 }: { size?: number }) => (
     <path d="M184 352 H328 M184 386 H294" stroke="var(--muted)" strokeWidth="18" />
   </svg>
 )
-/** Balance / scale. */
-export const IconScale = (p: P) => (
-  <Base {...p}><path d="M12 4v15M7 19h10" /><path d="M5 8h14" /><path d="M5 8l-3 6a3 3 0 0 0 6 0L5 8zM19 8l-3 6a3 3 0 0 0 6 0l-3-6z" /></Base>
+/** Percent — used for Scale. */
+export const IconPercent = (p: P) => (
+  <Base {...p} strokeLinecap="square"><path d="M19 5 5 19" /><circle cx="7" cy="7" r="2.5" /><circle cx="17" cy="17" r="2.5" /></Base>
 )
