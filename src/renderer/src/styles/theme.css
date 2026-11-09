@@ -928,3 +928,50 @@ svg text { font-family: var(--mono); }
 .data-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .data-actions .btn { width: 100%; justify-content: center; }
 .data-actions > :last-child:nth-child(odd) { grid-column: 1 / -1; }
+
+/* ───────── formula editor footer actions ───────── */
+.editor-foot { flex: none; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line-soft); }
+@media (max-width: 700px) {
+  .editor-foot { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .editor-foot .spacer { display: none; }
+  .editor-foot .btn { width: 100%; justify-content: center; }
+  .editor-foot > .btn:nth-last-child(1):nth-child(odd) { grid-column: 1 / -1; }
+}
+
+/* ───────── assemble fragrance ───────── */
+.asm .page-head { margin-bottom: 18px; }
+.asm-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin-bottom: 12px; overflow: hidden; }
+.asm-summary .metric + .metric { border-left: 1px solid rgba(255,255,255,.06); }
+.asm-list { padding: 4px 0; }
+.asm-row { display: grid; grid-template-columns: 34px minmax(0, 1fr) 90px 120px 90px 52px; align-items: center; gap: 10px; padding: 8px 16px; border-bottom: 1px solid var(--line-soft); min-height: 58px; }
+.asm-row:last-child { border-bottom: 0; }
+.asm-row .n { text-align: right; font-variant-numeric: tabular-nums; }
+.asm-row .no { color: var(--faint); font-size: 11px; }
+.asm-row .mat { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.asm-row .nm { display: flex; align-items: center; gap: 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.asm-row .meta { font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.asm-row .tgt { font-size: 15px; }
+.asm-row.done { color: var(--muted); }
+.asm-row.done .tgt { color: var(--muted); }
+.asm-row.current { background: rgba(255,255,255,.045); box-shadow: inset 2px 0 0 #fff; }
+.asm-headrow { min-height: 0; padding-top: 10px; padding-bottom: 10px; font-size: 9px; letter-spacing: .18em; text-transform: uppercase; color: var(--faint); }
+.asm-input { text-align: right; height: 40px; }
+.asm-alcohol .nm { letter-spacing: .08em; text-transform: uppercase; font-size: 11px; }
+@media (max-width: 700px) {
+  .asm-summary { grid-template-columns: 1fr 1fr; }
+  .asm-summary .metric:nth-child(3) { border-left: 0; border-top: 1px solid rgba(255,255,255,.06); }
+  .asm-summary .metric:nth-child(4) { border-top: 1px solid rgba(255,255,255,.06); }
+  .asm-row { grid-template-columns: 22px minmax(0, 1fr) 64px 84px 44px; padding: 8px 10px; gap: 8px; }
+  .asm-row > :nth-child(5) { display: none; } /* scale reading column hidden on phones */
+}
+
+/* accord material info (Library drawer) */
+.accord-box { display: flex; flex-direction: column; gap: 8px; padding: 12px; border: 1px solid var(--line); border-radius: var(--ctl); background: rgba(255,255,255,.025); }
+.accord-parts { max-height: 220px; overflow-y: auto; }
+.accord-parts .stat-row { padding: 3px 0; font-size: 11px; }
+@media (max-width: 700px) {
+  /* phone top bar: only the current crumb, one line */
+  .crumb > :not(:last-child) { display: none; }
+  .crumb > :last-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .asm-row .nm { white-space: normal; overflow: visible; }
+}

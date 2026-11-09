@@ -1,4 +1,5 @@
 import { isWeb } from '@/platform'
+import { Seg } from '@/components/Seg'
 import { APP_VERSION } from '@shared/version'
 import { useEffect, useState } from 'react'
 import type { AppData, NoteLevel } from '@shared/types'
@@ -170,6 +171,16 @@ export function SettingsView() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
           <div className="card card-pad">
             <h3 className="card-title">Calculation</h3>
+            <div className="field mb">
+              <label>Balance resolution</label>
+              <Seg
+                block
+                value={String(settings.balanceStep ?? 0.01)}
+                onChange={(v) => updateSettings({ balanceStep: Number(v) })}
+                options={['0.1', '0.01', '0.001'].map((v) => ({ value: v, label: `${v} g` }))}
+              />
+              <span className="hint">Smallest step your scale shows — used to round scaled formulas and the Assemble targets.</span>
+            </div>
             <div className="grid-2">
               <div className="field">
                 <label>Drop mass</label>

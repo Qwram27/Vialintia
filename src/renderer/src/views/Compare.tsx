@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import type { Formula } from '@shared/types'
 import { NOTE_LABELS, NOTE_ORDER } from '@shared/defaults'
-import { familyById, useMaterialMap, useStore } from '@/store/store'
+import { familyById, useAccordIndex, useMaterialMap, useStore } from '@/store/store'
 import { navigate } from '@/store/ui'
 import { computeFormula, diffVersions, fmt, fmtSmart, inkOn, type DiffKind } from '@/lib/calc'
 
@@ -21,6 +21,7 @@ export function Compare({ a, b }: { a?: string; b?: string }) {
   const formulas = useStore((s) => s.formulas)
   const settings = useStore((s) => s.settings)
   const materials = useMaterialMap()
+  const accords = useAccordIndex()
 
   // Sensible defaults: last two versions of the given (or most recent) formula.
   const selA = useMemo(() => {
@@ -40,8 +41,8 @@ export function Compare({ a, b }: { a?: string; b?: string }) {
 
   const options = formulas.flatMap((f) => f.versions.map((v) => ({ key: `${f.id}:${v.id}`, label: `${f.name} — ${v.label}` })))
 
-  const calcA = selA ? computeFormula(selA.f, selA.v.rows, materials, settings) : null
-  const calcB = selB ? computeFormula(selB.f, selB.v.rows, materials, settings) : null
+  const calcA = selA ? computeFormula(selA.f, selA.v.rows, materials, settings, accords) : null
+  const calcB = selB ? computeFormula(selB.f, selB.v.rows, materials, settings, accords) : null
   const diff = calcA && calcB ? diffVersions(calcA.rows, calcB.rows) : []
 
   const go = (na?: string, nb?: string) => {
