@@ -218,4 +218,14 @@ describe('starter library', () => {
     expect(out.find((m) => m.name === 'Hedione')!.tenacityHours).toBe(999)
     expect(upgradeSeedLibrary(out, SEED_VERSION)).toBe(out)
   })
+
+  it('moves starter materials from DPG to ethanol (v3) but leaves user materials alone', () => {
+    const lib = seeds.map((m) => ({ ...m, solvent: m.defaultDilution < 100 ? 'DPG' : undefined }))
+    lib.push({ ...lib[0], id: 'mine', name: 'My own base', solvent: 'DPG' })
+    const out = upgradeSeedLibrary(lib, 2)
+    expect(out.length).toBe(lib.length)
+    expect(out.filter((m) => m.name !== 'My own base' && m.solvent === 'DPG')).toHaveLength(0)
+    expect(out.find((m) => m.name === 'My own base')!.solvent).toBe('DPG')
+    expect(seeds.every((m) => m.defaultDilution === 100 || m.solvent === 'EtOH')).toBe(true)
+  })
 })

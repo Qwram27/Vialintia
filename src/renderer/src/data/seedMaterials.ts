@@ -9,7 +9,7 @@ import { uid } from '@/lib/id'
 type Seed = [name: string, cas: string, family: string, note: NoteLevel, dilution: number, type: MaterialType, description: string]
 
 /** Bump when seeds are added so existing libraries receive the new materials once. */
-export const SEED_VERSION = 2
+export const SEED_VERSION = 3
 /** Number of seeds shipped in v1 (the rest were added in v2). */
 const V1_COUNT = 78
 
@@ -179,7 +179,7 @@ function toMaterial([name, cas, family, note, defaultDilution, type, description
     note,
     tenacityHours: null,
     defaultDilution,
-    solvent: defaultDilution < 100 ? 'DPG' : undefined,
+    solvent: defaultDilution < 100 ? 'EtOH' : undefined,
     pricePerKg: null,
     supplier: '',
     ifraLimit: null,
@@ -207,7 +207,7 @@ const V1_TENACITY: Record<string, number> = {"Bergamot oil": 2.0, "Lemon oil": 1
 export function upgradeSeedLibrary(materials: Material[], fromVersion: number): Material[] {
   if (fromVersion >= SEED_VERSION) return materials
   const now = new Date().toISOString()
-  const fixed = materials.map((m) => {
+  const fixed = fromVersion >= 2 ? materials : materials.map((m) => {
     let next = m
     const cas = V1_WRONG_CAS[m.name]
     if (cas && m.cas === cas[0]) next = { ...next, cas: cas[1] }
@@ -215,7 +215,11 @@ export function upgradeSeedLibrary(materials: Material[], fromVersion: number): 
     if (t != null && m.tenacityHours === t) next = { ...next, tenacityHours: null }
     return next === m ? m : { ...next, updatedAt: now }
   })
-  const have = new Set(fixed.map((m) => m.name.trim().toLowerCase()))
+  // v3: default dilution solvent is ethanol (was DPG) — only for starter materials still on DPG.
+  const seedNames = new Set(SEEDS.map((x) => x[0]))
+  const solventFixed = fromVersion < 3 ? fixed.map((m) => (seedNames.has(m.name) && m.solvent === 'DPG' ? { ...m, solvent: 'EtOH', updatedAt: now } : m)) : fixed
+  if (fromVersion >= 2) return solventFixed
+  const have = new Set(solventFixed.map((m) => m.name.trim().toLowerCase()))
   const added = SEEDS.slice(V1_COUNT).filter((s) => !have.has(s[0].toLowerCase())).map((s) => toMaterial(s, now))
-  return [...fixed, ...added]
+  return [...solventFixed, ...added]
 }

@@ -31,7 +31,8 @@ interface State {
   redo(id: string): void
 
   updateSettings(patch: Partial<Settings>): void
-  replaceAll(data: Partial<AppData>): void
+  replaceAll(data: Partial<AppData> & { seedVersion?: number }): void
+  resetAll(): void
 }
 
 const HISTORY_LIMIT = 150
@@ -289,9 +290,18 @@ export const useStore = create<State>((set, get) => ({
   replaceAll(data) {
     set({
       // Backups from older versions also receive the newer starter materials.
-      materials: Array.isArray(data.materials) ? upgradeSeedLibrary(data.materials, data.settings?.seedVersion ?? 1) : get().materials,
+      materials: Array.isArray(data.materials) ? upgradeSeedLibrary(data.materials, data.seedVersion ?? data.settings?.seedVersion ?? 1) : get().materials,
       formulas: Array.isArray(data.formulas) ? data.formulas.map(normalizeFormula) : get().formulas,
       settings: { ...(data.settings ? normalizeSettings(data.settings) : get().settings), seedVersion: SEED_VERSION },
+      history: {}
+    })
+  },
+
+  resetAll() {
+    set({
+      materials: seedMaterials(),
+      formulas: [],
+      settings: { ...normalizeSettings(undefined), seedVersion: SEED_VERSION },
       history: {}
     })
   }
