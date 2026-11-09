@@ -1044,3 +1044,6 @@ svg text { font-family: var(--mono); }
   .cmp-struct-name { grid-column: 1 / -1; }
   .cmp-group td.l small { display: none; }
 }
+
+/* Analyze: no zebra — added / removed rows are marked by the Change column and strike-through only */
+.cmp-table .diff-added td, .cmp-table .diff-removed td { background: transparent; }
