@@ -9,6 +9,7 @@ import { Compare } from '@/views/Compare'
 import { SettingsView } from '@/views/Settings'
 import { ConfirmHost, ToastHost } from '@/components/Overlays'
 import { useIsMobile } from '@/lib/useMobile'
+import { APP_VERSION } from '@shared/version'
 import { IconAnalyze, IconGear, IconPowder, IconSheet } from '@/components/Icons'
 
 const NAV = [
@@ -90,7 +91,7 @@ export function App() {
           )}
           <div className="sidebar-foot">
             <span>Offline</span>
-            <span>v1.4.8</span>
+            <span>{APP_VERSION}</span>
           </div>
         </aside>
       )}

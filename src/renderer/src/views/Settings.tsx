@@ -1,4 +1,5 @@
 import { isWeb } from '@/platform'
+import { APP_VERSION } from '@shared/version'
 import { useEffect, useState } from 'react'
 import type { AppData, NoteLevel } from '@shared/types'
 import { DEFAULT_FAMILIES, DEFAULT_NOTE_COLORS, DEFAULT_SETTINGS, NOTE_LABELS, NOTE_ORDER } from '@shared/defaults'
@@ -262,7 +263,7 @@ export function SettingsView() {
           <div className="card card-pad">
             <h3 className="card-title">About</h3>
             <div className="muted small" style={{ lineHeight: 1.7 }}>
-              Vialintia 1.4 — fine fragrance formulation archive.
+              Vialintia {APP_VERSION} — fine fragrance formulation archive.
               <br />
               Percentages: <b>Weighed %</b> is the share of what you put on the scale; <b>In product %</b> is the neat material in the finished
               perfume after dilution and the chosen concentration — the figure IFRA limits apply to.
