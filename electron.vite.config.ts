@@ -16,6 +16,7 @@ export default defineConfig({
         '@shared': resolve('src/shared')
       }
     },
+    define: { __BUILD_TIME__: JSON.stringify(new Date().toISOString()) },
     plugins: [react()]
   }
 })
