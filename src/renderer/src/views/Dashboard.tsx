@@ -9,7 +9,7 @@ import { NoteBar } from '@/components/Charts'
 import { Seg } from '@/components/Seg'
 import { IconCopy, IconPlus, IconSearch, IconTrash, IconUpload } from '@/components/Icons'
 
-const STATUS_LABEL: Record<FormulaStatus, string> = { draft: 'Draft', testing: 'Testing', final: 'Final' }
+const STATUS_LABEL: Record<FormulaStatus, string> = { testing: 'Testing', final: 'Final' }
 
 export function Dashboard() {
   const formulas = useStore((s) => s.formulas)
@@ -64,7 +64,7 @@ export function Dashboard() {
   }, [formulas, materials, settings, accords, q, status, sort])
 
   const counts = useMemo(() => {
-    const c = { all: formulas.length, draft: 0, testing: 0, final: 0 }
+    const c = { all: formulas.length, testing: 0, final: 0 }
     formulas.forEach((f) => c[f.status]++)
     return c
   }, [formulas])
@@ -139,7 +139,7 @@ export function Dashboard() {
             <Seg
               value={status}
               onChange={setStatus}
-              options={(['all', 'draft', 'testing', 'final'] as const).map((s) => ({
+              options={(['all', 'testing', 'final'] as const).map((s) => ({
                 value: s,
                 label: (
                   <>

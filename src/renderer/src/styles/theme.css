@@ -223,7 +223,6 @@ a { color: var(--text); }
 
 .status { display: inline-flex; align-items: center; gap: 7px; font-size: 9.5px; letter-spacing: .22em; text-transform: uppercase; }
 .status::before { content: ''; width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
-.status-draft { color: var(--muted); }
 .status-testing { color: var(--near); }
 .status-final { color: var(--text); }
 
