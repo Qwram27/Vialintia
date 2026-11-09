@@ -20,6 +20,21 @@ export function Dashboard() {
   const [q, setQ] = useState('')
   const [status, setStatus] = useState<FormulaStatus | 'all'>('all')
   const [sort, setSort] = useState<'updated' | 'name' | 'number'>('updated')
+  const [view, setViewState] = useState<'grid' | 'index'>(() => {
+    try {
+      return localStorage.getItem('vialintia.view') === 'index' ? 'index' : 'grid'
+    } catch {
+      return 'grid'
+    }
+  })
+  const setView = (v: 'grid' | 'index') => {
+    setViewState(v)
+    try {
+      localStorage.setItem('vialintia.view', v)
+    } catch {
+      /* ignore */
+    }
+  }
 
   const list = useMemo(() => {
     const query = q.trim().toLowerCase()
@@ -103,6 +118,14 @@ export function Dashboard() {
             />
             <div className="spacer" />
             <Seg
+              value={view}
+              onChange={setView}
+              options={[
+                { value: 'grid', label: 'Grid' },
+                { value: 'index', label: 'Index' }
+              ]}
+            />
+            <Seg
               value={sort}
               onChange={setSort}
               options={[
@@ -113,6 +136,55 @@ export function Dashboard() {
             />
           </div>
 
+          {view === 'index' ? (
+            <div className="card index-card">
+              <table className="ftable itable">
+                <thead>
+                  <tr>
+                    <th className="l">N°</th>
+                    <th className="l">Name</th>
+                    <th className="l">Status</th>
+                    <th className="l">Season</th>
+                    <th className="l">Version</th>
+                    <th>Mat.</th>
+                    <th>Conc.</th>
+                    <th className="l" style={{ width: 160 }}>Structure</th>
+                    <th>IFRA</th>
+                    <th>Updated</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {list.map(({ f, v, no, calc }, i) => (
+                    <tr key={f.id} style={{ '--i': i } as React.CSSProperties} onClick={() => navigate(`/formula/${f.id}`)}>
+                      <td className="l idx-no">{no}</td>
+                      <td className="l idx-name">{f.name}</td>
+                      <td className="l">
+                        <span className={`status status-${f.status}`}>{STATUS_LABEL[f.status]}</span>
+                      </td>
+                      <td className="l muted">{seasonCode(f.createdAt)}</td>
+                      <td className="l muted">{v.label}</td>
+                      <td className="muted">{calc.materialCount}</td>
+                      <td>{f.concentration}%</td>
+                      <td className="l">
+                        <NoteBar byNote={calc.byNote} settings={settings} />
+                      </td>
+                      <td>
+                        {calc.ifra.worst === 'over' ? (
+                          <span className="ifra ifra-over">! Over</span>
+                        ) : calc.ifra.worst === 'none' ? (
+                          <span className="dim">—</span>
+                        ) : (
+                          <span className={`ifra ifra-${calc.ifra.worst}`}>{calc.ifra.worst === 'near' ? '◐ Near' : '✓ OK'}</span>
+                        )}
+                      </td>
+                      <td className="muted">{shortDate(f.updatedAt)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {list.length === 0 && <div className="empty">No entries match.</div>}
+            </div>
+          ) : (
           <div className="formula-grid">
             {list.map(({ f, v, no, calc }, i) => (
               <div key={f.id} className="card fcard" style={{ '--i': i } as React.CSSProperties} onClick={() => navigate(`/formula/${f.id}`)}>
@@ -171,6 +243,7 @@ export function Dashboard() {
             ))}
             {list.length === 0 && <div className="muted">No entries match.</div>}
           </div>
+          )}
         </>
       )}
     </div>

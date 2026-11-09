@@ -257,7 +257,7 @@ export function SettingsView() {
           <div className="card card-pad">
             <h3 className="card-title">About</h3>
             <div className="muted small" style={{ lineHeight: 1.7 }}>
-              Vialintia 1.1 — fine fragrance formulation archive.
+              Vialintia 1.2 — fine fragrance formulation archive.
               <br />
               Percentages: <b>Weighed %</b> is the share of what you put on the scale; <b>In product %</b> is the neat material in the finished
               perfume after dilution and the chosen concentration — the figure IFRA limits apply to.

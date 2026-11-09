@@ -86,7 +86,7 @@ export function App() {
         )}
         <div className="sidebar-foot">
           <span>Offline</span>
-          <span>v1.1</span>
+          <span>v1.2</span>
         </div>
       </aside>
       <main className="main" ref={mainRef} onScroll={(e) => setScrolled(e.currentTarget.scrollTop > 4)}>

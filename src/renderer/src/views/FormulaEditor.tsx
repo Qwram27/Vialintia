@@ -9,7 +9,7 @@ import { uid } from '@/lib/id'
 import { NumberInput } from '@/components/NumberInput'
 import { MaterialPicker } from '@/components/MaterialPicker'
 import { IfraBadge, statusColor } from '@/components/Ifra'
-import { EvolutionChart, FamilyDonut, StructureChart } from '@/components/Charts'
+import { EvolutionChart, FamilyDonut, NoteBar, StructureChart } from '@/components/Charts'
 import { Seg } from '@/components/Seg'
 import { catalogNo, seasonCode, shortDate } from '@/lib/archive'
 import { Stars } from '@/components/Overlays'
@@ -73,13 +73,15 @@ export function FormulaEditor({ id }: { id: string }) {
   const setRows = (rows: FormulaRow[]) => update((f) => withRows(f, rows))
 
   return (
-    <div className="page page-wide" style={{ maxWidth: 1700 }}>
-      <Header formula={formula} update={update} calc={calc} versionLabel={version.label} canUndo={!!history?.past.length} canRedo={!!history?.future.length} onUndo={() => undo(id)} onRedo={() => redo(id)} settings={settings} />
-      <Versions formula={formula} update={update} />
+    <div className="page page-wide editor-page">
+      <Header formula={formula} update={update} calc={calc} versionLabel={version.label} canUndo={!!history?.past.length} canRedo={!!history?.future.length} onUndo={() => undo(id)} onRedo={() => redo(id)} settings={settings}>
+        <Versions formula={formula} update={update} />
+      </Header>
+      <Metrics formula={formula} calc={calc} settings={settings} />
 
-      <div className="editor">
-        <div className="card card-pad" style={{ minWidth: 0 }}>
-          <div className="tabs">
+      <div className="workspace">
+        <div className="card pane">
+          <div className="pane-head">
             <Seg
               size="lg"
               value={tab}
@@ -91,14 +93,16 @@ export function FormulaEditor({ id }: { id: string }) {
               ]}
             />
           </div>
-          {tab === 'composition' && (
-            <Composition formula={formula} rows={version.rows} calc={calc} setRows={setRows} update={update} settings={settings} />
-          )}
-          {tab === 'notes' && <Notes formula={formula} update={update} />}
-          {tab === 'details' && <Details formula={formula} update={update} />}
+          <div className="pane-body">
+            {tab === 'composition' && (
+              <Composition formula={formula} rows={version.rows} calc={calc} setRows={setRows} update={update} settings={settings} />
+            )}
+            {tab === 'notes' && <Notes formula={formula} update={update} />}
+            {tab === 'details' && <Details formula={formula} update={update} />}
+          </div>
         </div>
 
-        <Sidebar formula={formula} calc={calc} update={update} settings={settings} />
+        <Inspector formula={formula} calc={calc} update={update} settings={settings} />
       </div>
     </div>
   )
@@ -106,8 +110,9 @@ export function FormulaEditor({ id }: { id: string }) {
 
 // ---------------------------------------------------------------- header
 function Header({
-  formula, update, calc, versionLabel, canUndo, canRedo, onUndo, onRedo, settings
+  formula, update, calc, versionLabel, canUndo, canRedo, onUndo, onRedo, settings, children
 }: {
+  children?: React.ReactNode
   formula: Formula
   update: (fn: (f: Formula) => Formula, history?: boolean) => void
   calc: FormulaCalc
@@ -170,6 +175,7 @@ function Header({
             onKeyDown={(e) => e.key === 'Enter' && addTag()}
             onBlur={addTag}
           />
+          {children}
         </div>
       </div>
       <div className="btn-group">
@@ -575,8 +581,80 @@ function Composition({
   )
 }
 
-// ---------------------------------------------------------------- sidebar
-function Sidebar({
+// ---------------------------------------------------------------- metrics strip
+function Metrics({ formula, calc, settings }: { formula: Formula; calc: FormulaCalc; settings: Settings }) {
+  const b = calc.batch
+  const cur = settings.currency
+  const over = calc.ifra.entries.filter((e) => e.status === 'over').length
+  const near = calc.ifra.entries.filter((e) => e.status === 'near').length
+  const ifraState = calc.ifra.entries.length === 0 ? 'none' : over ? 'over' : near ? 'near' : 'ok'
+  const noteTotal = calc.byNote.top + calc.byNote.heart + calc.byNote.base
+  const product = formula.productType === 'custom' ? 'Custom' : PRODUCT_PRESETS[formula.productType].label
+  return (
+    <div className="metrics">
+      <div className="metric">
+        <div className="k">Concentrate</div>
+        <div className="v">
+          {fmt(calc.totalGrams, calc.totalGrams < 10 ? 3 : 2)}
+          <small>{formula.unit === 'parts' ? 'pt' : 'g'}</small>
+        </div>
+        <div className="s">{calc.materialCount} materials</div>
+      </div>
+      <div className="metric">
+        <div className="k">Product</div>
+        <div className="v">
+          {fmt(formula.concentration, 1)}
+          <small>%</small>
+        </div>
+        <div className="s">{product}</div>
+      </div>
+      <div className="metric">
+        <div className="k">Batch</div>
+        <div className="v">
+          {fmt(b.concentrateG, 2)}
+          <small>g</small>
+        </div>
+        <div className="s">+ {fmt(b.alcoholMl, 1)} ml alcohol</div>
+      </div>
+      <div className="metric">
+        <div className="k">Cost / kg</div>
+        <div className="v">
+          {calc.costPerKg > 0 ? (
+            <>
+              {cur}
+              {fmt(calc.costPerKg, 0)}
+            </>
+          ) : (
+            '—'
+          )}
+        </div>
+        <div className="s">{b.costPerBottle != null && b.costPerBottle > 0 ? `${cur}${fmt(b.costPerBottle, 2)} / bottle` : 'no prices'}</div>
+      </div>
+      <div className="metric metric-wide">
+        <div className="k">Structure</div>
+        <div className="mstruct">
+          {NOTE_ORDER.map((n) => (
+            <span key={n}>
+              <i style={{ background: settings.noteColors[n] }} />
+              {NOTE_LABELS[n].slice(0, 1)} {noteTotal > 0 ? fmt((calc.byNote[n] / noteTotal) * 100, 0) : '—'}
+            </span>
+          ))}
+        </div>
+        <NoteBar byNote={calc.byNote} settings={settings} />
+      </div>
+      <div className={`metric metric-ifra is-${ifraState}`}>
+        <div className="k">IFRA</div>
+        <div className="v">{ifraState === 'none' ? '—' : ifraState === 'over' ? `! ${over}` : ifraState === 'near' ? '◐' : '✓'}</div>
+        <div className="s">
+          {ifraState === 'none' ? 'no limits set' : calc.ifra.maxConcentration != null ? `max ${fmt(calc.ifra.maxConcentration, 2)}%` : 'within limits'}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------- inspector
+function Inspector({
   formula, calc, update, settings
 }: {
   formula: Formula
@@ -584,6 +662,7 @@ function Sidebar({
   update: (fn: (f: Formula) => Formula, history?: boolean) => void
   settings: Settings
 }) {
+  const [tab, setTab] = useState<'setup' | 'ifra' | 'analysis'>('setup')
   const b = calc.batch
   const ifra = calc.ifra
   const over = ifra.entries.filter((e) => e.status === 'over').length
@@ -592,36 +671,23 @@ function Sidebar({
   const setBatch = (patch: Partial<Formula['batch']>) => update((f) => ({ ...f, batch: { ...f.batch, ...patch } }))
 
   return (
-    <div className="side">
-      <div className="card card-pad">
-        <div className="stats-3">
-          <div className="stat-tile">
-            <div className="k">Total</div>
-            <div className="v">
-              {fmt(calc.totalGrams, calc.totalGrams < 10 ? 3 : 2)}
-              <span className="faint small"> {formula.unit === 'parts' ? 'pt' : 'g'}</span>
-            </div>
-          </div>
-          <div className="stat-tile">
-            <div className="k">Items</div>
-            <div className="v">{calc.materialCount}</div>
-          </div>
-          <div className="stat-tile">
-            <div className="k">Cost/kg</div>
-            <div className="v">{calc.costPerKg > 0 ? `${cur}${fmt(calc.costPerKg, 0)}` : '—'}</div>
-          </div>
-        </div>
-        {calc.solventGrams > 0.00001 && (
-          <div className="stat-row">
-            <span className="k">Neat / solvent</span>
-            <span className="v">
-              {fmtSmart(calc.neatGrams)} / {fmtSmart(calc.solventGrams)}
-            </span>
-          </div>
-        )}
+    <div className="card pane">
+      <div className="pane-head">
+        <Seg
+          block
+          value={tab}
+          onChange={setTab}
+          options={[
+            { value: 'setup', label: 'Setup' },
+            { value: 'ifra', label: <>IFRA{over ? <span className="tab-alert">!</span> : null}</> },
+            { value: 'analysis', label: 'Analysis' }
+          ]}
+        />
       </div>
-
-      <div className="card card-pad">
+      <div className="pane-body" key={tab}>
+        {tab === 'setup' && (
+          <div className="insp fade-in">
+      <section className="insp-sec">
         <h3 className="card-title">
           Product <small>{fmt(formula.concentration, 1)}% concentrate</small>
         </h3>
@@ -661,9 +727,8 @@ function Sidebar({
             </div>
           </div>
         </div>
-      </div>
-
-      <div className="card card-pad">
+      </section>
+      <section className="insp-sec">
         <h3 className="card-title">
           Batch
           <Seg
@@ -740,9 +805,25 @@ function Sidebar({
             )}
           </>
         )}
-      </div>
-
-      <div className="card card-pad">
+      </section>
+            {calc.solventGrams > 0.00001 && (
+              <section className="insp-sec">
+                <h3 className="card-title">Dilution</h3>
+                <div className="stat-row">
+                  <span className="k">Neat material</span>
+                  <span className="v">{fmtSmart(calc.neatGrams)} g</span>
+                </div>
+                <div className="stat-row">
+                  <span className="k">Solvent in dilutions</span>
+                  <span className="v">{fmtSmart(calc.solventGrams)} g</span>
+                </div>
+              </section>
+            )}
+          </div>
+        )}
+        {tab === 'ifra' && (
+          <div className="insp fade-in">
+      <section className="insp-sec">
         <h3 className="card-title">
           IFRA <small>Category 4</small>
         </h3>
@@ -757,7 +838,7 @@ function Sidebar({
               style={{
                 background: over ? 'var(--over-bg)' : near ? 'var(--near-bg)' : 'var(--ok-bg)',
                 color: statusColor(over ? 'over' : near ? 'near' : 'ok'),
-                border: over ? '1px solid rgba(180,128,204,.5)' : '1px solid transparent'
+                border: over ? '1px solid rgba(185,162,230,.5)' : '1px solid transparent'
               }}
             >
               {over ? <IconAlert /> : <IconCheck />}
@@ -798,19 +879,25 @@ function Sidebar({
           </>
         )}
         <div className="faint small mt">Uses the limits you enter per material — verify against the current IFRA Standards.</div>
-      </div>
-
-      <div className="card card-pad">
-        <h3 className="card-title">Structure</h3>
-        <StructureChart byNote={calc.byNote} settings={settings} />
-      </div>
-      <div className="card card-pad">
-        <h3 className="card-title">Families</h3>
-        <FamilyDonut byFamily={calc.byFamily} settings={settings} />
-      </div>
-      <div className="card card-pad">
-        <h3 className="card-title">Evolution</h3>
-        <EvolutionChart rows={calc.rows} settings={settings} />
+      </section>
+          </div>
+        )}
+        {tab === 'analysis' && (
+          <div className="insp fade-in">
+            <section className="insp-sec">
+              <h3 className="card-title">Structure</h3>
+              <StructureChart byNote={calc.byNote} settings={settings} />
+            </section>
+            <section className="insp-sec">
+              <h3 className="card-title">Families</h3>
+              <FamilyDonut byFamily={calc.byFamily} settings={settings} />
+            </section>
+            <section className="insp-sec">
+              <h3 className="card-title">Evolution</h3>
+              <EvolutionChart rows={calc.rows} settings={settings} />
+            </section>
+          </div>
+        )}
       </div>
     </div>
   )
