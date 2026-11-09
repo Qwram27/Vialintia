@@ -89,7 +89,7 @@ export function App() {
           )}
           <div className="sidebar-foot">
             <span>Offline</span>
-            <span>v1.4.0</span>
+            <span>v1.4.4</span>
           </div>
         </aside>
       )}
@@ -104,7 +104,12 @@ export function App() {
       {mobile && (
         <nav className="tabbar" aria-label="Sections">
           {NAV.map((n, i) => (
-            <button key={n.key} className={`tab-item${active === n.key ? ' active' : ''}`} onClick={() => navigate(n.path)}>
+            <button
+              key={n.key}
+              className={`tab-item${active === n.key ? ' active' : ''}`}
+              aria-current={active === n.key ? 'page' : undefined}
+              onClick={() => navigate(n.path)}
+            >
               <span className="idx">{String(i + 1).padStart(2, '0')}</span>
               <span className="lbl">{n.label}</span>
             </button>
@@ -120,6 +125,7 @@ export function App() {
 function TopBar({ route, scrolled }: { route: Route; scrolled: boolean }) {
   const formulas = useStore((s) => s.formulas)
   const saving = useSaveState((s) => s.saving)
+  const error = useSaveState((s) => s.error)
   const formula = route.name === 'formula' ? formulas.find((f) => f.id === route.id) : undefined
   const idx = NAV.findIndex((n) => n.key === (route.name === 'formula' ? 'dashboard' : route.name))
   const section = NAV[idx]
@@ -145,9 +151,9 @@ function TopBar({ route, scrolled }: { route: Route; scrolled: boolean }) {
           </span>
         )}
       </div>
-      <div className={`savestate${saving ? ' saving' : ''}`}>
+      <div className={`savestate ${error ? 'error' : saving ? 'saving' : 'saved'}`} role="status" aria-live="polite">
         <i />
-        {saving ? 'Saving' : 'Saved'}
+        {error ? 'Not saved' : saving ? 'Saving' : 'Saved'}
       </div>
     </div>
   )

@@ -800,3 +800,43 @@ svg text { font-family: var(--mono); }
   .toasts { bottom: calc(var(--tabbar-h) + var(--sab) + 18px); }
   .cpop { left: 50% !important; transform: translateX(-50%); }
 }
+
+/* ─────────────────────────────────────────────────────────────
+   1.4.2 — save status, phone picker, sheet gestures. No glows anywhere.
+   ───────────────────────────────────────────────────────────── */
+:root {
+  /* the one sanctioned accent: neon green that only ever means "saved" */
+  --saved: rgb(0, 255, 0);
+}
+
+/* save status: green = saved, white/grey = saving or not saved — flat, no glow */
+.savestate i { box-shadow: none !important; }
+.savestate.saved { color: var(--saved); }
+.savestate.saved i { background: var(--saved); }
+.savestate.saving { color: var(--text-2); }
+.savestate.saving i { background: #fff; }
+.savestate.error { color: #fff; }
+.savestate.error i { background: transparent; box-shadow: inset 0 0 0 1.5px #fff !important; }
+
+/* no luminous halos */
+.btn-primary { box-shadow: inset 0 1px 0 #fff; }
+
+/* bottom sheets: drag the handle down to dismiss */
+.sheet { padding-top: 0; transition: transform .45s var(--spring); }
+.sheet.dragging { transition: none; }
+.sheet-head { padding: 10px 0 6px; touch-action: none; }
+.sheet-head .row { margin-bottom: 8px; }
+.sheet-grab { margin-bottom: 10px; }
+.sheet-overlay.closing { animation: fade-out .26s var(--ease) forwards; }
+.sheet-overlay.closing .sheet { transform: translateY(105%) !important; transition: transform .3s var(--ease); }
+@keyframes fade-out { to { opacity: 0; } }
+.sheet-drawer .drawer { background: none; box-shadow: none; padding: 0; position: static; max-height: none; overflow: visible; animation: none; border-radius: 0; backdrop-filter: none; }
+
+/* picker list scrolls on its own — never drags the page behind it */
+.picker-list { overscroll-behavior: contain; -webkit-overflow-scrolling: touch; touch-action: pan-y; }
+@media (max-width: 700px) {
+  /* sit below the top bar instead of over the save status */
+  .picker-pop { top: calc(var(--sat) + 52px) !important; }
+}
+/* focus = brighter hairline, no halo */
+.input:focus, .select:focus, .textarea:focus, .cell-input:focus { box-shadow: none; }

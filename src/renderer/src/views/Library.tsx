@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react'
-import { createPortal } from 'react-dom'
 import type { Material, MaterialType, NoteLevel } from '@shared/types'
 import { NOTE_LABELS, NOTE_ORDER } from '@shared/defaults'
 import { familyById, useStore } from '@/store/store'
@@ -9,6 +8,7 @@ import { csvToMaterials, materialsToCsv } from '@/lib/exports'
 import { NumberInput } from '@/components/NumberInput'
 import { Seg } from '@/components/Seg'
 import { useIsMobile } from '@/lib/useMobile'
+import { Sheet } from '@/components/Sheet'
 import { IconDownload, IconPlus, IconSearch, IconTrash, IconUpload, IconX } from '@/components/Icons'
 
 const TYPES: Record<MaterialType, string> = { natural: 'Natural', synthetic: 'Synthetic', base: 'Base / accord', other: 'Other' }
@@ -249,14 +249,9 @@ export function Library() {
         )}
         {sel &&
           (mobile ? (
-            createPortal(
-              <div className="overlay sheet-overlay" onClick={() => setSelected(null)}>
-                <div className="sheet-wrap" onClick={(e) => e.stopPropagation()}>
-                  <MaterialDrawer key={sel.id} material={sel} usage={usage.get(sel.id) ?? 0} onClose={() => setSelected(null)} />
-                </div>
-              </div>,
-              document.body
-            )
+            <Sheet onClose={() => setSelected(null)} className="sheet-drawer">
+              <MaterialDrawer key={sel.id} material={sel} usage={usage.get(sel.id) ?? 0} onClose={() => setSelected(null)} />
+            </Sheet>
           ) : (
             <MaterialDrawer key={sel.id} material={sel} usage={usage.get(sel.id) ?? 0} onClose={() => setSelected(null)} />
           ))}

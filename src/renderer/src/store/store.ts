@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { DEFAULT_FAMILIES, DEFAULT_NOTE_COLORS, DEFAULT_SETTINGS, LEGACY_DEFAULT_COLORS, PRODUCT_PRESETS } from '@shared/defaults'
 import type { AppData, Formula, FormulaRow, FormulaVersion, Material, Settings } from '@shared/types'
-import { seedMaterials } from '@/data/seedMaterials'
+import { SEED_VERSION, seedMaterials, upgradeSeedLibrary } from '@/data/seedMaterials'
 import { uid } from '@/lib/id'
 
 interface History {
@@ -124,14 +124,16 @@ export const useStore = create<State>((set, get) => ({
 
   async init() {
     const data = await window.vialintia.load()
-    const firstRun = !data.materials
+    const firstRun = !Array.isArray(data.materials)
+    const seedFrom = data.settings?.seedVersion ?? 1
+    const upgrade = !firstRun && seedFrom < SEED_VERSION
     set({
-      materials: Array.isArray(data.materials) ? data.materials : seedMaterials(),
+      materials: firstRun ? seedMaterials() : upgrade ? upgradeSeedLibrary(data.materials!, seedFrom) : data.materials!,
       formulas: Array.isArray(data.formulas) ? data.formulas.map(normalizeFormula) : [],
-      settings: normalizeSettings(data.settings),
+      settings: { ...normalizeSettings(data.settings), seedVersion: SEED_VERSION },
       ready: true
     })
-    if (firstRun) {
+    if (firstRun || upgrade) {
       const s = get()
       window.vialintia.save('materials', s.materials)
       window.vialintia.save('formulas', s.formulas)
@@ -281,9 +283,10 @@ export const useStore = create<State>((set, get) => ({
 
   replaceAll(data) {
     set({
-      materials: Array.isArray(data.materials) ? data.materials : get().materials,
+      // Backups from older versions also receive the newer starter materials.
+      materials: Array.isArray(data.materials) ? upgradeSeedLibrary(data.materials, data.settings?.seedVersion ?? 1) : get().materials,
       formulas: Array.isArray(data.formulas) ? data.formulas.map(normalizeFormula) : get().formulas,
-      settings: data.settings ? normalizeSettings(data.settings) : get().settings,
+      settings: { ...(data.settings ? normalizeSettings(data.settings) : get().settings), seedVersion: SEED_VERSION },
       history: {}
     })
   }
@@ -294,7 +297,7 @@ const timers: Partial<Record<keyof AppData, ReturnType<typeof setTimeout>>> = {}
 const pending: Partial<Record<keyof AppData, unknown>> = {}
 
 /** Tiny store for the "saving / saved" indicator. */
-export const useSaveState = create<{ saving: boolean }>(() => ({ saving: false }))
+export const useSaveState = create<{ saving: boolean; error: boolean }>(() => ({ saving: false, error: false }))
 let inflight = 0
 
 function schedule(key: keyof AppData, value: unknown) {
@@ -312,7 +315,11 @@ function flush(key: keyof AppData) {
   inflight++
   window.vialintia
     .save(key, value)
-    .catch((err) => console.error('Save failed', err))
+    .then(() => useSaveState.setState({ error: false }))
+    .catch((err) => {
+      console.error('Save failed', err)
+      useSaveState.setState({ error: true })
+    })
     .finally(() => {
       inflight--
       if (inflight === 0 && Object.keys(pending).length === 0) setTimeout(() => useSaveState.setState({ saving: false }), 350)

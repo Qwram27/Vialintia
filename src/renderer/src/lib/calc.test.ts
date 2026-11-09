@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { DEFAULT_SETTINGS } from '@shared/defaults'
 import type { Formula, Material } from '@shared/types'
 import { computeFormula, diffVersions, evolution, ifraStatus, parseNum } from './calc'
+import { SEED_VERSION, seedMaterials, upgradeSeedLibrary } from '@/data/seedMaterials'
 
 const now = new Date().toISOString()
 const mat = (id: string, extra: Partial<Material> = {}): Material => ({
@@ -179,5 +180,42 @@ describe('archive codes', async () => {
     expect(seasonCode('2026-11-09T12:00:00')).toBe('AW27')
     expect(seasonCode('2027-01-15T12:00:00')).toBe('AW27')
     expect(seasonCode('2026-05-01T12:00:00')).toBe('SS26')
+  })
+})
+
+// ---------------------------------------------------------------- starter library
+
+describe('starter library', () => {
+  const seeds = seedMaterials()
+
+  it('has unique names and well-formed CAS numbers with valid check digits', () => {
+    const names = seeds.map((m) => m.name.toLowerCase())
+    expect(new Set(names).size).toBe(names.length)
+    for (const m of seeds) {
+      if (!m.cas) continue
+      const match = /^(\d{2,7})-(\d{2})-(\d)$/.exec(m.cas)
+      expect(match, `${m.name}: ${m.cas}`).not.toBeNull()
+      const digits = (match![1] + match![2]).split('').reverse()
+      const sum = digits.reduce((s, d, i) => s + Number(d) * (i + 1), 0)
+      expect(sum % 10, `${m.name}: CAS check digit ${m.cas}`).toBe(Number(match![3]))
+    }
+  })
+
+  it('upgrades a v1 library without duplicating or overriding user edits', () => {
+    const v1 = seeds.slice(0, 78).map((m) => ({ ...m }))
+    const galb = v1.find((m) => m.name === 'Galbanum oil')!
+    galb.cas = '8023-91-6' // wrong v1 value
+    galb.tenacityHours = 12 // v1 estimate
+    const clary = v1.find((m) => m.name === 'Clary sage oil')!
+    clary.cas = 'user-edited'
+    const hedione = v1.find((m) => m.name === 'Hedione')!
+    hedione.tenacityHours = 999 // user value
+    const out = upgradeSeedLibrary(v1, 1)
+    expect(out.length).toBe(seeds.length)
+    expect(out.find((m) => m.name === 'Galbanum oil')!.cas).toBe('8023-91-4')
+    expect(out.find((m) => m.name === 'Galbanum oil')!.tenacityHours).toBeNull()
+    expect(out.find((m) => m.name === 'Clary sage oil')!.cas).toBe('user-edited')
+    expect(out.find((m) => m.name === 'Hedione')!.tenacityHours).toBe(999)
+    expect(upgradeSeedLibrary(out, SEED_VERSION)).toBe(out)
   })
 })

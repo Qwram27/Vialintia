@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import type { Material } from '@shared/types'
 import { NOTE_LABELS } from '@shared/defaults'
 import { familyById, useStore } from '@/store/store'
+import { useIsMobile } from '@/lib/useMobile'
 
 interface Props {
   material?: Material
@@ -32,6 +33,7 @@ export function MaterialPicker({ material, missing, onPick, autoOpen, onClose }:
   const popRef = useRef<HTMLDivElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
   const [pos, setPos] = useState({ left: 0, top: 0 })
+  const mobile = useIsMobile()
 
   const results = useMemo(() => {
     const query = q.trim().toLowerCase()
@@ -63,6 +65,15 @@ export function MaterialPicker({ material, missing, onPick, autoOpen, onClose }:
     return () => document.removeEventListener('pointerdown', onDown)
   })
 
+  // Phones: freeze the page behind the picker so a swipe scrolls only the material list.
+  useEffect(() => {
+    if (!open || !mobile) return
+    const scrollers = Array.from(document.querySelectorAll<HTMLElement>('.main, .sheet'))
+    const prev = scrollers.map((el) => el.style.overflow)
+    scrollers.forEach((el) => (el.style.overflow = 'hidden'))
+    return () => scrollers.forEach((el, i) => (el.style.overflow = prev[i]))
+  }, [open, mobile])
+
   useEffect(() => setHl(0), [q])
   useEffect(() => {
     listRef.current?.querySelector('.hl')?.scrollIntoView({ block: 'nearest' })
@@ -82,6 +93,73 @@ export function MaterialPicker({ material, missing, onPick, autoOpen, onClose }:
 
   const fam = material ? familyById(settings, material.family) : null
 
+  const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'ArrowDown') {
+      setHl((h) => Math.min(total - 1, h + 1))
+      e.preventDefault()
+    } else if (e.key === 'ArrowUp') {
+      setHl((h) => Math.max(0, h - 1))
+      e.preventDefault()
+    } else if (e.key === 'Enter') {
+      if (total > 0) choose(hl)
+      e.preventDefault()
+    } else if (e.key === 'Escape') close()
+  }
+
+  const search = (
+    <input
+      className="input"
+      autoFocus
+      autoComplete="off"
+      autoCorrect="off"
+      spellCheck={false}
+      enterKeyHint="done"
+      placeholder="Search by name, CAS or odour…"
+      value={q}
+      onChange={(e) => setQ(e.target.value)}
+      onKeyDown={onKeyDown}
+    />
+  )
+
+  const list = (
+    <div className="picker-list" ref={listRef}>
+      {results.map((m, i) => {
+        const f = familyById(settings, m.family)
+        return (
+          <div
+            key={m.id}
+            className={`picker-opt${i === hl ? ' hl' : ''}`}
+            onMouseEnter={() => setHl(i)}
+            onMouseDown={(e) => {
+              e.preventDefault()
+              choose(i)
+            }}
+          >
+            <span className="dot" style={{ background: f.color }} />
+            <span className="nm">{m.name}</span>
+            <span className="meta">
+              {f.name} · {NOTE_LABELS[m.note]}
+              {m.defaultDilution < 100 ? ` · ${m.defaultDilution}%` : ''}
+            </span>
+          </div>
+        )
+      })}
+      {canCreate && (
+        <div
+          className={`picker-opt create${hl === results.length ? ' hl' : ''}`}
+          onMouseEnter={() => setHl(results.length)}
+          onMouseDown={(e) => {
+            e.preventDefault()
+            choose(results.length)
+          }}
+        >
+          + Create “{q.trim()}” in library
+        </div>
+      )}
+      {total === 0 && <div className="picker-opt faint">No materials found</div>}
+    </div>
+  )
+
   return (
     <div className="picker">
       <button ref={btnRef} className="picker-btn" onClick={() => (open ? close() : setOpen(true))}>
@@ -99,61 +177,8 @@ export function MaterialPicker({ material, missing, onPick, autoOpen, onClose }:
       {open &&
         createPortal(
           <div ref={popRef} className="picker-pop fade-in" style={{ left: pos.left, top: pos.top }}>
-            <input
-              className="input"
-              autoFocus
-              placeholder="Search by name, CAS or odour…"
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'ArrowDown') {
-                  setHl((h) => Math.min(total - 1, h + 1))
-                  e.preventDefault()
-                } else if (e.key === 'ArrowUp') {
-                  setHl((h) => Math.max(0, h - 1))
-                  e.preventDefault()
-                } else if (e.key === 'Enter') {
-                  if (total > 0) choose(hl)
-                  e.preventDefault()
-                } else if (e.key === 'Escape') close()
-              }}
-            />
-            <div className="picker-list" ref={listRef}>
-              {results.map((m, i) => {
-                const f = familyById(settings, m.family)
-                return (
-                  <div
-                    key={m.id}
-                    className={`picker-opt${i === hl ? ' hl' : ''}`}
-                    onMouseEnter={() => setHl(i)}
-                    onMouseDown={(e) => {
-                      e.preventDefault()
-                      choose(i)
-                    }}
-                  >
-                    <span className="dot" style={{ background: f.color }} />
-                    <span>{m.name}</span>
-                    <span className="meta">
-                      {f.name} · {NOTE_LABELS[m.note]}
-                      {m.defaultDilution < 100 ? ` · ${m.defaultDilution}%` : ''}
-                    </span>
-                  </div>
-                )
-              })}
-              {canCreate && (
-                <div
-                  className={`picker-opt create${hl === results.length ? ' hl' : ''}`}
-                  onMouseEnter={() => setHl(results.length)}
-                  onMouseDown={(e) => {
-                    e.preventDefault()
-                    choose(results.length)
-                  }}
-                >
-                  + Create “{q.trim()}” in library
-                </div>
-              )}
-              {total === 0 && <div className="picker-opt faint">No materials found</div>}
-            </div>
+            {search}
+            {list}
           </div>,
           document.body
         )}
