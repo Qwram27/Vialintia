@@ -16,9 +16,9 @@ Offline fine-fragrance formulation app (Electron + React + TypeScript, electron-
 - **No glows** anywhere (no luminous halos / coloured box-shadow blurs, no focus halos). Owner rejected decorative "AI-looking" UI: no sliding glass thumbs, rotating chevrons, staggered list animations, pulsing dots. Keep it raw and flat.
 - No botanical/plant motifs (rejected as generic).
 - Note & olfactive-family colours stay user-adjustable (Settings → colours).
-- Navigation: icons, no 01–04 numbers (sidebar + tab bar). Nav icons in `Icons.tsx` (`IconSheet` formulas, `IconPowder` materials = a rounded heap drawn from many small grains, `IconAnalyze` plotted curve, `IconGear` plain six-tooth gear) use square caps / mitred joins. The Compare section is labelled **Analyze** (route stays `/compare`).
+- Navigation: icons, no 01–04 numbers (sidebar + tab bar). Nav icons in `Icons.tsx` (`IconSheet` formulas, `IconPowder` materials = outlined rounded powder heap with grains inside and a few spilling out (owner's reference), `IconAnalyze` plotted curve, `IconGear` plain six-tooth gear) use square caps / mitred joins. The Compare section is labelled **Analyze** (route stays `/compare`).
 - Selected / primary fill (`.seg-thumb`, `.vchip.on`, `.btn-primary`) = soft pearl grey `--fill` #c9ccd0 with near-black text — not bright white.
-- Dashboard kicker is hard-coded `Archive · AV27` (owner request); per-formula season codes stay computed.
+- Dashboard kicker is hard-coded `Archive · AW27` (owner request); per-formula season codes stay computed.
 - Version labels are `V1, V2…`. Season code: SS = Mar–Aug of year Y → `SSyy`; AW = Sep–Feb, named by the year it runs into (Nov 2026 → `AW27`).
 - PDF export (`formulaToPdfHtml` in `src/renderer/src/lib/exports.ts`) is a plain black-on-white lab formula sheet, Arial, gridded table with a ✓ weighing column.
 
@@ -26,7 +26,7 @@ Offline fine-fragrance formulation app (Electron + React + TypeScript, electron-
 - `src/main` — window (hidden title bar + overlay), JSON storage in `%APPDATA%/Vialintia/data` with atomic writes + startup backups, PDF via hidden window.
 - `src/preload` — exposes `window.vialintia` (`StoreApi` in `src/shared/types.ts`).
 - `src/renderer/src` — React app. `store/store.ts` (zustand, debounced persistence, undo/redo, data migrations in `normalizeSettings`/`normalizeFormula`), `store/ui.ts` (hash router, toasts, confirm), `views/` (Dashboard grid/index, FormulaEditor = metrics strip + composition pane + inspector tabs, Library, Compare, Settings), `components/Seg.tsx` (sliding segmented control).
-- Releases so far: 1.0 botanical → 1.1 archive → 1.2 workspace layout → 1.3 liquid glass/squarer → 1.3.1 mono IFRA + classic PDF → 1.4 iPhone web app (PWA) → 1.4.1 verified starter library (seed v2, `upgradeSeedLibrary`) → 1.4.2 phone picker/sheets, save status → 1.4.3 decorative effects removed, neon-green saved, no glows → 1.4.4 compact picker back, list-only scrolling → 1.4.5 iOS full-height fix, tab icons, IFRA near-limit default 90% → 1.4.6 nav icons everywhere, no nav numbers, Analyze, static phone top bar → 1.4.7 powder-heap + plain gear icons, pearl-grey selected fill.
+- Releases so far: 1.0 botanical → 1.1 archive → 1.2 workspace layout → 1.3 liquid glass/squarer → 1.3.1 mono IFRA + classic PDF → 1.4 iPhone web app (PWA) → 1.4.1 verified starter library (seed v2, `upgradeSeedLibrary`) → 1.4.2 phone picker/sheets, save status → 1.4.3 decorative effects removed, neon-green saved, no glows → 1.4.4 compact picker back, list-only scrolling → 1.4.5 iOS full-height fix, tab icons, IFRA near-limit default 90% → 1.4.6 nav icons everywhere, no nav numbers, Analyze, static phone top bar → 1.4.7 powder-heap + plain gear icons, pearl-grey selected fill → 1.4.8 outlined powder icon, AW27 kicker.
 
 ## iPhone web app (PWA) — done in 1.4
 - `npm run dev:web` / `build:web` (→ `dist-web/`) / `preview:web`, config `vite.web.config.mts` (relative base `./`, injects PWA head tags, generates `sw.js` precaching every built file; navigation = network-first, assets = cache-first).
