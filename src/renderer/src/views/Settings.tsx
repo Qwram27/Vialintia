@@ -243,7 +243,7 @@ export function SettingsView() {
             <div className="small faint mb" style={{ wordBreak: 'break-all' }}>
               {dataPath}
             </div>
-            <div className="btn-group" style={{ flexWrap: 'wrap' }}>
+            <div className="data-actions">
               <button
                 className="btn"
                 onClick={async () => {

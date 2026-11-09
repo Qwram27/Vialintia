@@ -151,4 +151,12 @@ export const SEED_REF: Record<string, SeedRef> = {
   "Cade oil rectified": { ifraStd: '119', ifraAmendment: 47, ifraNote: 'IFRA Std 119: crude cade oil prohibited; only rectified oils within the PAH limits.' },
   "Norlimbanol": { ifra: 1.3, ifraStd: '221', ifraAmendment: 51 },
   "Vertofix": { t: 400 },
+  "Spearmint oil": { t: 36, ifraNote: 'Main constituent l-carvone is restricted by IFRA Std 016 (Cat. 4: 0.59 % carvone in the product); natural contributions count — check the supplier certificate' },
+  "Scotch spearmint oil": { ifraNote: 'Rich in l-carvone, restricted by IFRA Std 016 (Cat. 4: 0.59 % carvone in the product); natural contributions count — check the supplier certificate' },
+  "Cornmint oil": { t: 16 },
+  "Bergamot mint oil": { t: 88 },
+  "l-Menthol": { t: 32, tAt: 20 },
+  "l-Menthone": { t: 4 },
+  "l-Carvone": { t: 24, ifra: 0.59, ifraStd: '016', ifraAmendment: 49 },
+  "l-Menthyl acetate": { t: 10 },
 }

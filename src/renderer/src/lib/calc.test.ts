@@ -230,6 +230,14 @@ describe('starter library', () => {
     expect(out.find((m) => m.name === 'Calone')!.tenacityHours).toBeNull()
   })
 
+  it('adds the v5 mints to a v4 library once', () => {
+    const v4 = seeds.filter((m) => !/mint|menth|carvone/i.test(m.name) || m.name === 'Peppermint oil')
+    const out = upgradeSeedLibrary(v4, 4)
+    expect(out.length).toBe(seeds.length)
+    expect(out.find((m) => m.name === 'l-Carvone')!.ifraLimit).toBe(0.59)
+    expect(upgradeSeedLibrary(out, 5)).toBe(out)
+  })
+
   it('moves starter materials from DPG to ethanol (v3) but leaves user materials alone', () => {
     const lib = seeds.map((m) => ({ ...m, solvent: m.defaultDilution < 100 ? 'DPG' : undefined }))
     lib.push({ ...lib[0], id: 'mine', name: 'My own base', solvent: 'DPG' })

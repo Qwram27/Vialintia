@@ -10,9 +10,12 @@ import { SEED_REF } from './seedReference'
 type Seed = [name: string, cas: string, family: string, note: NoteLevel, dilution: number, type: MaterialType, description: string]
 
 /** Bump when seeds are added so existing libraries receive the new materials once. */
-export const SEED_VERSION = 4
-/** Number of seeds shipped in v1 (the rest were added in v2). */
-const V1_COUNT = 78
+export const SEED_VERSION = 5
+/** Where each later batch of starter materials begins in SEEDS: [seed version, first index]. */
+const ADDED_AT: [version: number, from: number][] = [
+  [2, 78],
+  [5, 151]
+]
 
 const SEEDS: Seed[] = [
   // ---- original library (v1) ----
@@ -169,6 +172,17 @@ const SEEDS: Seed[] = [
   ['Norlimbanol', '70788-30-6', 'woody', 'base', 10, 'synthetic', 'Firmenich: extremely powerful dry woody-amber, animalic'],
   ['Vertofix', '32388-55-9', 'woody', 'base', 100, 'synthetic', 'Methyl cedryl ketone / acetyl cedrene: dry cedar, woody-amber, slightly leathery'],
   ['Ambrocenide', '211299-54-6', 'amber', 'base', 1, 'synthetic', 'Symrise: extremely powerful, long-lasting woody amber. Crystalline'],
+
+  // ---- added in seed v5: mints ----
+  ['Spearmint oil', '8008-79-5', 'herbal', 'top', 100, 'natural', 'Mentha spicata: minty, green, cooling, slightly spicy; rich in l-carvone'],
+  ['Scotch spearmint oil', '91770-24-0', 'herbal', 'top', 100, 'natural', 'Mentha × gracilis: sweet, smooth spearmint, carvone'],
+  ['Cornmint oil', '68917-18-0', 'herbal', 'top', 100, 'natural', 'Mentha arvensis: peppermint-like, mentholic, herbal; the main natural source of menthol'],
+  ['Bergamot mint oil', '68917-15-7', 'aromatic', 'top', 100, 'natural', 'Mentha citrata: sweet, fresh, lavender, clary sage and bergamot facets'],
+  ['Peppermint absolute', '84082-70-2', 'herbal', 'top', 10, 'natural', 'Mentha piperita: peppermint, cool, green, fresh leaf'],
+  ['l-Menthol', '2216-51-5', 'herbal', 'top', 10, 'synthetic', 'Peppermint, cooling, mentholic. Crystalline'],
+  ['l-Menthone', '14073-97-3', 'herbal', 'top', 100, 'synthetic', 'Deep minty, herbal, camphoraceous'],
+  ['l-Carvone', '6485-40-1', 'herbal', 'top', 10, 'synthetic', 'Sweet spearmint, herbal; the key odorant of spearmint'],
+  ['l-Menthyl acetate', '2623-23-6', 'herbal', 'top', 100, 'synthetic', 'Mentholic, minty, herbal tea, slightly fruity'],
 ]
 
 /** Seed description plus where its tenacity / IFRA figures come from. */
@@ -247,8 +261,11 @@ export function upgradeSeedLibrary(materials: Material[], fromVersion: number): 
         return changed ? { ...next, updatedAt: now } : m
       })
     : solventFixed
-  if (fromVersion >= 2) return refFixed
   const have = new Set(refFixed.map((m) => m.name.trim().toLowerCase()))
-  const added = SEEDS.slice(V1_COUNT).filter((s) => !have.has(s[0].toLowerCase())).map((s) => toMaterial(s, now))
+  const added = SEEDS.filter((seed, i) => {
+    let batch = 1 // seed version the entry was introduced in
+    for (const [ver, from] of ADDED_AT) if (i >= from) batch = ver
+    return batch > fromVersion && !have.has(seed[0].toLowerCase())
+  }).map((x) => toMaterial(x, now))
   return [...refFixed, ...added]
 }

@@ -923,3 +923,8 @@ svg text { font-family: var(--mono); }
 /* app mark in the sidebar brand */
 .brand-name { display: flex; align-items: center; gap: 12px; }
 .brand-name svg { flex: none; color: var(--text); }
+
+/* Settings → Data: even 2-column grid of equal buttons (odd last one spans the row) */
+.data-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.data-actions .btn { width: 100%; justify-content: center; }
+.data-actions > :last-child:nth-child(odd) { grid-column: 1 / -1; }
