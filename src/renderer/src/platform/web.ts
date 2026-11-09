@@ -93,7 +93,8 @@ async function exportText(data: string, defaultName: string, ext: string): Promi
   const nav = navigator as Navigator & { canShare?: (d: ShareData) => boolean }
   if (isTouch() && nav.canShare?.({ files: [file] })) {
     try {
-      await nav.share({ files: [file], title: name })
+      // Files only — any title/text is saved by iOS as extra "Text" files next to the export.
+      await nav.share({ files: [file] })
       return name
     } catch (err) {
       if ((err as DOMException)?.name === 'AbortError') return null
