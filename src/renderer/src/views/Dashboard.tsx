@@ -76,7 +76,7 @@ export function Dashboard() {
     <div className="page">
       <div className="page-head">
         <div>
-          <div className="page-kicker">Archive · {seasonCode(new Date().toISOString())}</div>
+          <div className="page-kicker">Archive · AW27</div>
           <h1 className="page-title">Formulas</h1>
           <div className="page-sub">
             {String(formulas.length).padStart(3, '0')} entries · {materials.size} materials
