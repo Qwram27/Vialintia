@@ -919,3 +919,7 @@ svg text { font-family: var(--mono); }
 .btn-primary { background: var(--fill); border-color: var(--fill-line); color: var(--fill-ink); box-shadow: none; font-weight: 500; }
 .btn-primary:hover { background: var(--fill-hi); border-color: rgba(255,255,255,.4); }
 .vchip.on { background: var(--fill); border-color: var(--fill-line); color: var(--fill-ink); }
+
+/* app mark in the sidebar brand */
+.brand-name { display: flex; align-items: center; gap: 12px; }
+.brand-name svg { flex: none; color: var(--text); }

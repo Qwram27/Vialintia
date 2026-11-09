@@ -85,3 +85,13 @@ export const IconGear = (p: P) => (
     <circle cx="12" cy="12" r="2.8" />
   </NavBase>
 )
+
+/** App mark — same drawing as the app icon (formula sheet + V). */
+export const LogoMark = ({ size = 22 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="132 76 256 360" fill="none" strokeLinecap="square" strokeLinejoin="miter" aria-hidden>
+    <path d="M138 88 H310 L374 152 V424 H138 Z" stroke="currentColor" strokeWidth="18" />
+    <path d="M310 88 V152 H374" stroke="currentColor" strokeWidth="18" />
+    <path d="M184 180 L230 300 L276 180" stroke="currentColor" strokeWidth="28" />
+    <path d="M184 352 H328 M184 386 H294" stroke="var(--muted)" strokeWidth="18" />
+  </svg>
+)
