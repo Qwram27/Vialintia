@@ -55,12 +55,12 @@ export function MaterialPicker({ material, missing, onPick, autoOpen, onClose }:
 
   useEffect(() => {
     if (!open) return
-    const onDown = (e: MouseEvent) => {
+    const onDown = (e: PointerEvent) => {
       if (popRef.current?.contains(e.target as Node) || btnRef.current?.contains(e.target as Node)) return
       close()
     }
-    document.addEventListener('mousedown', onDown)
-    return () => document.removeEventListener('mousedown', onDown)
+    document.addEventListener('pointerdown', onDown)
+    return () => document.removeEventListener('pointerdown', onDown)
   })
 
   useEffect(() => setHl(0), [q])

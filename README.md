@@ -11,6 +11,22 @@ npm test           # calculation unit tests
 npm run build:win  # dist/Vialintia-Setup-x.y.z.exe + dist/Vialintia-x.y.z-portable.exe
 ```
 
+## iPhone / web app (PWA)
+
+The same renderer also builds as an offline web app for iPhone:
+
+```bash
+npm run dev:web      # browser dev server (open on the phone via the LAN address)
+npm run build:web    # → dist-web/ (static, relative paths, service worker, manifest)
+npm run preview:web  # serve dist-web locally
+```
+
+Deployed by `.github/workflows/pages.yml` to GitHub Pages on every push to `main`
+(one-time: repo Settings → Pages → Source: **GitHub Actions**).
+On the iPhone: open the Pages URL in Safari → Share → **Add to Home Screen**. After the first
+load it works fully offline. Data is kept on the phone (IndexedDB); move data between PC and
+phone with Settings → Export backup / Restore backup. PDF: the print sheet → Share → Save to Files.
+
 ## Data
 
 Stored locally as JSON in `%APPDATA%\Vialintia\data` (materials, formulas, settings).

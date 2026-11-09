@@ -1,3 +1,4 @@
+import { isWeb } from '@/platform'
 import { useEffect, useState } from 'react'
 import type { AppData, NoteLevel } from '@shared/types'
 import { DEFAULT_FAMILIES, DEFAULT_NOTE_COLORS, DEFAULT_SETTINGS, NOTE_LABELS, NOTE_ORDER } from '@shared/defaults'
@@ -207,7 +208,9 @@ export function SettingsView() {
           <div className="card card-pad">
             <h3 className="card-title">Data & backups</h3>
             <p className="muted small" style={{ marginTop: 0 }}>
-              Everything is stored locally on this computer — no account, no internet. A snapshot is taken automatically every time the app starts (last 10 kept).
+              {isWeb
+                ? 'Everything is stored on this device, in the browser — no account, works offline. Use Export backup / Restore backup to move data between your computer and phone.'
+                : 'Everything is stored locally on this computer — no account, no internet. A snapshot is taken automatically every time the app starts (last 10 kept).'}
             </p>
             <div className="small faint mb" style={{ wordBreak: 'break-all' }}>
               {dataPath}
@@ -248,16 +251,18 @@ export function SettingsView() {
               >
                 <IconUpload /> Restore backup
               </button>
-              <button className="btn btn-ghost" onClick={() => window.vialintia.openDataFolder()}>
-                <IconFolder /> Open data folder
-              </button>
+              {!isWeb && (
+                <button className="btn btn-ghost" onClick={() => window.vialintia.openDataFolder()}>
+                  <IconFolder /> Open data folder
+                </button>
+              )}
             </div>
           </div>
 
           <div className="card card-pad">
             <h3 className="card-title">About</h3>
             <div className="muted small" style={{ lineHeight: 1.7 }}>
-              Vialintia 1.3 — fine fragrance formulation archive.
+              Vialintia 1.4 — fine fragrance formulation archive.
               <br />
               Percentages: <b>Weighed %</b> is the share of what you put on the scale; <b>In product %</b> is the neat material in the finished
               perfume after dilution and the chosen concentration — the figure IFRA limits apply to.

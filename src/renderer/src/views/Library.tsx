@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
 import type { Material, MaterialType, NoteLevel } from '@shared/types'
 import { NOTE_LABELS, NOTE_ORDER } from '@shared/defaults'
 import { familyById, useStore } from '@/store/store'
@@ -7,6 +8,7 @@ import { fmt, fmtTrim, inkOn } from '@/lib/calc'
 import { csvToMaterials, materialsToCsv } from '@/lib/exports'
 import { NumberInput } from '@/components/NumberInput'
 import { Seg } from '@/components/Seg'
+import { useIsMobile } from '@/lib/useMobile'
 import { IconDownload, IconPlus, IconSearch, IconTrash, IconUpload, IconX } from '@/components/Icons'
 
 const TYPES: Record<MaterialType, string> = { natural: 'Natural', synthetic: 'Synthetic', base: 'Base / accord', other: 'Other' }
@@ -24,6 +26,7 @@ export function Library() {
   const [type, setType] = useState<MaterialType | 'all'>('all')
   const [sort, setSort] = useState<SortKey>('name')
   const [selected, setSelected] = useState<string | null>(null)
+  const mobile = useIsMobile()
 
   const usage = useMemo(() => {
     const m = new Map<string, number>()
@@ -144,7 +147,47 @@ export function Library() {
         <span className="faint small">{list.length} shown</span>
       </div>
 
-      <div className={`lib${sel ? ' with-drawer' : ''}`}>
+      <div className={`lib${sel && !mobile ? ' with-drawer' : ''}`}>
+        {mobile ? (
+          <div className="m-list">
+            {list.map((m) => {
+              const f = familyById(settings, m.family)
+              return (
+                <button key={m.id} className={`m-row${m.id === selected ? ' sel' : ''}`} onClick={() => setSelected(m.id)}>
+                  <span className="m-row-main">
+                    <span className="m-row-name">
+                      <span className="dot" style={{ background: f.color }} />
+                      <span className="nm">{m.name}</span>
+                    </span>
+                    <span className="m-row-meta">
+                      <span className="note-pill" style={{ background: settings.noteColors[m.note], color: inkOn(settings.noteColors[m.note]) }}>
+                        {NOTE_LABELS[m.note].slice(0, 1)}
+                      </span>
+                      <span>{f.name}</span>
+                      {m.cas && (
+                        <>
+                          <span>·</span>
+                          <span>{m.cas}</span>
+                        </>
+                      )}
+                      {usage.get(m.id) ? (
+                        <>
+                          <span>·</span>
+                          <span>{usage.get(m.id)}×</span>
+                        </>
+                      ) : null}
+                    </span>
+                  </span>
+                  <span className="m-row-amt">
+                    <span className="v small">{m.ifraLimit != null ? `${fmtTrim(m.ifraLimit)}%` : '—'}</span>
+                    <span className="u">{m.pricePerKg ? `${settings.currency}${fmt(m.pricePerKg, 0)}/kg` : 'IFRA'}</span>
+                  </span>
+                </button>
+              )
+            })}
+            {list.length === 0 && <div className="empty">No materials match your filters.</div>}
+          </div>
+        ) : (
         <div className="card" style={{ padding: '4px 10px 10px', minWidth: 0 }}>
           <div className="table-wrap">
             <table className="ftable ltable">
@@ -203,7 +246,20 @@ export function Library() {
             {list.length === 0 && <div className="empty">No materials match your filters.</div>}
           </div>
         </div>
-        {sel && <MaterialDrawer key={sel.id} material={sel} usage={usage.get(sel.id) ?? 0} onClose={() => setSelected(null)} />}
+        )}
+        {sel &&
+          (mobile ? (
+            createPortal(
+              <div className="overlay sheet-overlay" onClick={() => setSelected(null)}>
+                <div className="sheet-wrap" onClick={(e) => e.stopPropagation()}>
+                  <MaterialDrawer key={sel.id} material={sel} usage={usage.get(sel.id) ?? 0} onClose={() => setSelected(null)} />
+                </div>
+              </div>,
+              document.body
+            )
+          ) : (
+            <MaterialDrawer key={sel.id} material={sel} usage={usage.get(sel.id) ?? 0} onClose={() => setSelected(null)} />
+          ))}
       </div>
     </div>
   )

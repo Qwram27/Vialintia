@@ -8,6 +8,7 @@ import { Library } from '@/views/Library'
 import { Compare } from '@/views/Compare'
 import { SettingsView } from '@/views/Settings'
 import { ConfirmHost, ToastHost } from '@/components/Overlays'
+import { useIsMobile } from '@/lib/useMobile'
 
 const NAV = [
   { key: 'dashboard', label: 'Formulas', path: '/' },
@@ -24,6 +25,7 @@ export function App() {
   const route = useRoute()
   const mainRef = useRef<HTMLElement>(null)
   const [scrolled, setScrolled] = useState(false)
+  const mobile = useIsMobile()
 
   useEffect(() => {
     init()
@@ -49,46 +51,48 @@ export function App() {
 
   return (
     <div className="app">
-      <aside className="sidebar">
-        <div className="brand drag">
-          <div className="brand-name">VIALINTIA</div>
-          <div className="brand-sub">Formulation archive</div>
-          <div className="brand-rule" />
-        </div>
-        <nav className="nav">
-          {NAV.map((n, i) => (
-            <button key={n.key} className={`nav-item${active === n.key ? ' active' : ''}`} onClick={() => navigate(n.path)}>
-              <span className="idx">{String(i + 1).padStart(2, '0')}</span>
-              {n.label}
-            </button>
-          ))}
-        </nav>
-        {recent.length > 0 && (
-          <>
-            <div className="nav-section">
-              <span>Recent</span>
-              <span>{String(formulas.length).padStart(3, '0')}</span>
-            </div>
-            <nav className="nav">
-              {recent.map((f) => (
-                <button
-                  key={f.id}
-                  className={`nav-item recent-item${route.name === 'formula' && route.id === f.id ? ' active' : ''}`}
-                  onClick={() => navigate(`/formula/${f.id}`)}
-                  title={f.name}
-                >
-                  <span className="idx">{catalogNo(f, formulas)}</span>
-                  <span>{f.name}</span>
-                </button>
-              ))}
-            </nav>
-          </>
-        )}
-        <div className="sidebar-foot">
-          <span>Offline</span>
-          <span>v1.3.1</span>
-        </div>
-      </aside>
+      {!mobile && (
+        <aside className="sidebar">
+          <div className="brand drag">
+            <div className="brand-name">VIALINTIA</div>
+            <div className="brand-sub">Formulation archive</div>
+            <div className="brand-rule" />
+          </div>
+          <nav className="nav">
+            {NAV.map((n, i) => (
+              <button key={n.key} className={`nav-item${active === n.key ? ' active' : ''}`} onClick={() => navigate(n.path)}>
+                <span className="idx">{String(i + 1).padStart(2, '0')}</span>
+                {n.label}
+              </button>
+            ))}
+          </nav>
+          {recent.length > 0 && (
+            <>
+              <div className="nav-section">
+                <span>Recent</span>
+                <span>{String(formulas.length).padStart(3, '0')}</span>
+              </div>
+              <nav className="nav">
+                {recent.map((f) => (
+                  <button
+                    key={f.id}
+                    className={`nav-item recent-item${route.name === 'formula' && route.id === f.id ? ' active' : ''}`}
+                    onClick={() => navigate(`/formula/${f.id}`)}
+                    title={f.name}
+                  >
+                    <span className="idx">{catalogNo(f, formulas)}</span>
+                    <span>{f.name}</span>
+                  </button>
+                ))}
+              </nav>
+            </>
+          )}
+          <div className="sidebar-foot">
+            <span>Offline</span>
+            <span>v1.4.0</span>
+          </div>
+        </aside>
+      )}
       <main className="main" ref={mainRef} onScroll={(e) => setScrolled(e.currentTarget.scrollTop > 4)}>
         <TopBar route={route} scrolled={scrolled} />
         {route.name === 'dashboard' && <Dashboard />}
@@ -97,6 +101,16 @@ export function App() {
         {route.name === 'compare' && <Compare a={route.a} b={route.b} />}
         {route.name === 'settings' && <SettingsView />}
       </main>
+      {mobile && (
+        <nav className="tabbar" aria-label="Sections">
+          {NAV.map((n, i) => (
+            <button key={n.key} className={`tab-item${active === n.key ? ' active' : ''}`} onClick={() => navigate(n.path)}>
+              <span className="idx">{String(i + 1).padStart(2, '0')}</span>
+              <span className="lbl">{n.label}</span>
+            </button>
+          ))}
+        </nav>
+      )}
       <ConfirmHost />
       <ToastHost />
     </div>

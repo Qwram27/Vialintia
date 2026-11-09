@@ -122,7 +122,7 @@ export function Compare({ a, b }: { a?: string; b?: string }) {
       </div>
 
       <div className="card" style={{ padding: '4px 12px 10px' }}>
-        <table className="ftable">
+        <table className="ftable cmp-table">
           <thead>
             <tr>
               <th className="l">Material</th>
