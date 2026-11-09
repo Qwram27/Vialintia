@@ -838,7 +838,7 @@ function Inspector({
               style={{
                 background: over ? 'var(--over-bg)' : near ? 'var(--near-bg)' : 'var(--ok-bg)',
                 color: statusColor(over ? 'over' : near ? 'near' : 'ok'),
-                border: over ? '1px solid rgba(185,162,230,.5)' : '1px solid transparent'
+                border: over ? '1px solid rgba(255,255,255,.45)' : '1px solid transparent'
               }}
             >
               {over ? <IconAlert /> : <IconCheck />}

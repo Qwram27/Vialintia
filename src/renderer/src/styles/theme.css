@@ -570,3 +570,24 @@ svg text { font-family: var(--mono); }
 /* fixed column layout so filtering never makes columns jump */
 .ltable { table-layout: fixed; }
 .ltable td, .ltable th { overflow: hidden; text-overflow: ellipsis; }
+
+/* IFRA / status in the same monochrome as the rest — brighter = more urgent.
+   Status is always also carried by a glyph (✓ ◐ !). */
+:root {
+  --ok: #9c9c9c;
+  --near: #d6d6d6;
+  --over: #ffffff;
+  --ok-bg: rgba(255, 255, 255, 0.045);
+  --near-bg: rgba(255, 255, 255, 0.08);
+  --over-bg: rgba(255, 255, 255, 0.15);
+}
+.ifra-ok { border-color: rgba(255,255,255,.06); }
+.ifra-near { border-color: rgba(255,255,255,.22); }
+.ifra-over { border-color: rgba(255,255,255,.55); box-shadow: inset 0 1px 0 rgba(255,255,255,.2); }
+.metric-ifra.is-over { background: linear-gradient(180deg, rgba(255,255,255,.16), rgba(255,255,255,.07)); }
+.tab-alert { background: #fff; color: #000; }
+.status-testing { color: #c4c4c4; }
+.status-final { color: #ffffff; }
+.diff-added td { background: rgba(255,255,255,.035); }
+.diff-removed td { background: rgba(255,255,255,.02); }
+.diff-removed td.l { text-decoration-color: rgba(255,255,255,.5); color: var(--muted); }

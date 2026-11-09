@@ -1,6 +1,6 @@
 import type { Formula, Material, MaterialType, NoteLevel, Settings } from '@shared/types'
 import { NOTE_LABELS, NOTE_ORDER, PRODUCT_PRESETS } from '@shared/defaults'
-import { fmt, fmtSmart, parseNum, type FormulaCalc } from './calc'
+import { fmt, fmtSmart, fmtTrim, parseNum, type FormulaCalc } from './calc'
 import { parseCsv, toCsv } from './csv'
 import { familyById } from '@/store/store'
 
@@ -83,71 +83,139 @@ const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&l
 export function formulaToPdfHtml(formula: Formula, versionLabel: string, calc: FormulaCalc, settings: Settings, no = ''): string {
   const product = formula.productType === 'custom' ? 'Custom' : PRODUCT_PRESETS[formula.productType].label
   const unit = formula.unit === 'drops' ? 'drops' : formula.unit === 'parts' ? 'parts' : 'g'
+  const b = calc.batch
+  const cur = settings.currency
   const noteTotal = calc.byNote.top + calc.byNote.heart + calc.byNote.base
+  const version = formula.versions.find((v) => v.label === versionLabel)
+  const date = (iso: string) => new Date(iso).toLocaleDateString('en-GB')
+  const amountSum = calc.rows.reduce((s, r) => s + r.row.amount, 0)
+  const over = calc.ifra.entries.filter((e) => e.status === 'over')
+
   const rows = calc.rows
-    .map((r) => {
-      const fam = r.material ? familyById(settings, r.material.family) : null
-      const ifra = r.material ? calc.ifra.byMaterial.get(r.material.id) : undefined
-      const flag = ifra?.status === 'over' ? ' class="over"' : ''
-      return `<tr${flag}>
-        <td class="l"><span class="dot" style="background:${fam?.color ?? '#999'}"></span>${esc(r.material?.name ?? 'Missing material')}</td>
-        <td class="l small">${r.material ? NOTE_LABELS[r.material.note] : ''}</td>
+    .map((r, i) => {
+      const m = r.material
+      const ifra = m ? calc.ifra.byMaterial.get(m.id) : undefined
+      const flag = ifra?.status === 'over'
+      return `<tr${flag ? ' class="flag"' : ''}>
+        <td class="c">${i + 1}</td>
+        <td class="l">${esc(m?.name ?? 'Missing material')}</td>
+        <td class="l mono">${esc(m?.cas ?? '')}</td>
+        <td class="c">${m ? NOTE_LABELS[m.note] : ''}</td>
+        <td class="c">${r.row.dilution < 100 ? `${fmtTrim(r.row.dilution)}% ${esc(r.row.solvent ?? '')}` : '100%'}</td>
         <td>${fmtSmart(r.row.amount)}</td>
-        <td>${r.row.dilution < 100 ? `${fmtSmart(r.row.dilution)}% ${esc(r.row.solvent ?? '')}` : 'neat'}</td>
         <td>${fmt(r.weighedPct, 3)}</td>
         <td>${fmt(r.productPct, 4)}</td>
-        <td>${ifra ? `${fmtSmart(ifra.limit)}${ifra.status === 'over' ? ' !' : ''}` : '—'}</td>
+        <td>${ifra ? `${fmtSmart(ifra.limit)}${flag ? ' !' : ''}` : '–'}</td>
         <td>${fmt(r.batchGrams, 3)}</td>
+        <td class="chk"></td>
       </tr>`
     })
     .join('')
-  const pyramid = NOTE_ORDER.map(
-    (n) => `<div class="pyr"><span class="dot" style="background:${settings.noteColors[n]}"></span>${NOTE_LABELS[n]} <b>${noteTotal > 0 ? fmt((calc.byNote[n] / noteTotal) * 100, 1) : '—'}%</b></div>`
-  ).join('')
-  const ifraOver = calc.ifra.entries.filter((e) => e.status === 'over')
+
+  const info: [string, string][] = [
+    ['Product', `${product}`],
+    ['Concentration', `${fmt(formula.concentration, 1)} %`],
+    ['Status', formula.status.charAt(0).toUpperCase() + formula.status.slice(1)],
+    ['Amounts in', unit],
+    [
+      'Batch',
+      formula.batch.mode === 'bottles'
+        ? `${formula.batch.bottles} × ${fmtSmart(formula.batch.bottleMl)} ml (${fmt(b.productMl, 1)} ml)`
+        : `${fmt(b.concentrateG, 2)} g concentrate`
+    ],
+    ['Concentrate to weigh', `${fmt(b.concentrateG, 2)} g`],
+    ['Alcohol', `${fmt(b.alcoholG, 2)} g  /  ${fmt(b.alcoholMl, 1)} ml`],
+    ['Created / updated', `${date(formula.createdAt)} / ${date(formula.updatedAt)}`]
+  ]
+  const infoHtml = info
+    .reduce<string[]>((acc, [k, v], i) => {
+      if (i % 2 === 0) acc.push('')
+      acc[acc.length - 1] += `<th>${k}</th><td>${esc(v)}</td>`
+      return acc
+    }, [])
+    .map((r) => `<tr>${r}</tr>`)
+    .join('')
+
+  const structure = NOTE_ORDER.map((n) => `${NOTE_LABELS[n]} ${noteTotal > 0 ? fmt((calc.byNote[n] / noteTotal) * 100, 1) : '–'} %`).join('   ·   ')
+
   return `<!doctype html><html><head><meta charset="utf-8"><title>${esc(formula.name)}</title>
 <style>
+  @page { size: A4; }
   * { box-sizing: border-box; }
-  body { font-family: 'Cascadia Mono', Consolas, 'Courier New', monospace; color: #111; font-size: 9.5px; margin: 0; }
-  h1 { font-weight: 300; font-size: 30px; margin: 0; letter-spacing: -0.04em; text-transform: uppercase; }
-  .kicker { letter-spacing: .25em; text-transform: uppercase; font-size: 8.5px; color: #777; margin-bottom: 10px; }
-  .meta { color: #666; text-transform: uppercase; letter-spacing: .08em; font-size: 8.5px; margin: 6px 0 16px; }
-  .grid { display: flex; gap: 10px; margin-bottom: 16px; }
-  .box { flex: 1; border: 1px solid #ddd; border-radius: 0; padding: 8px 10px; }
-  .box .k { font-size: 7.5px; letter-spacing: .18em; text-transform: uppercase; color: #888; }
-  .box .v { font-size: 14px; margin-top: 2px; }
-  table { width: 100%; border-collapse: collapse; }
-  th { font-size: 7.5px; letter-spacing: .16em; text-transform: uppercase; color: #888; text-align: right; padding: 6px; border-bottom: 1px solid #111; font-weight: 400; }
-  td { padding: 5px 6px; text-align: right; border-bottom: 1px solid #eee; font-variant-numeric: tabular-nums; }
-  .l { text-align: left; }
-  .small { color: #888; }
-  tr.over td { background: #f1f1f1; font-weight: 600; }
-  tfoot td { font-weight: 600; border-top: 1px solid #111; border-bottom: 0; }
-  .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
-  .pyr { display: inline-block; margin-right: 16px; }
-  .notes { margin-top: 16px; white-space: pre-wrap; color: #333; }
-  .warn { margin-top: 12px; padding: 8px 10px; border: 1px solid #111; color: #111; }
-  .foot { margin-top: 22px; font-size: 7.5px; letter-spacing: .1em; text-transform: uppercase; color: #999; border-top: 1px solid #ddd; padding-top: 6px; display: flex; justify-content: space-between; }
+  body { font-family: Arial, 'Segoe UI', Helvetica, sans-serif; color: #000; font-size: 9.5pt; margin: 0; }
+  .head { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 2px solid #000; padding-bottom: 8px; margin-bottom: 12px; }
+  .doc { font-size: 8pt; text-transform: uppercase; letter-spacing: .08em; color: #444; margin-bottom: 4px; }
+  h1 { font-size: 20pt; margin: 0; font-weight: bold; }
+  .ref { border-collapse: collapse; font-size: 8.5pt; }
+  .ref td { border: 1px solid #000; padding: 3px 8px; }
+  .ref td:first-child { background: #eee; font-weight: bold; }
+  table.info { width: 100%; border-collapse: collapse; margin-bottom: 14px; font-size: 8.5pt; }
+  .info th, .info td { border: 1px solid #999; padding: 4px 6px; text-align: left; }
+  .info th { background: #f0f0f0; width: 17%; font-weight: bold; }
+  h2 { font-size: 10pt; text-transform: uppercase; margin: 16px 0 6px; letter-spacing: .04em; }
+  table.comp { width: 100%; border-collapse: collapse; font-size: 8.5pt; }
+  .comp th { background: #e6e6e6; border: 1px solid #000; padding: 4px 5px; font-size: 7.5pt; text-transform: uppercase; text-align: right; }
+  .comp th.l { text-align: left; }
+  .comp th.c, .comp td.c { text-align: center; }
+  .comp td { border: 1px solid #999; padding: 3px 5px; text-align: right; }
+  .comp td.l { text-align: left; }
+  .comp tbody tr:nth-child(even) td { background: #fafafa; }
+  .comp tr.flag td { font-weight: bold; background: #ececec; }
+  .comp tfoot td { border: 1px solid #000; font-weight: bold; background: #f0f0f0; }
+  .chk { width: 22px; }
+  .mono { font-family: Consolas, 'Courier New', monospace; font-size: 7.5pt; white-space: nowrap; }
+  .comp td.c { white-space: nowrap; }
+  .summary { margin-top: 10px; font-size: 8.5pt; line-height: 1.6; }
+  .warn { margin-top: 8px; border: 1.5px solid #000; padding: 6px 8px; font-size: 8.5pt; }
+  .notes { border: 1px solid #999; min-height: 80px; padding: 6px 8px; font-size: 8.5pt; white-space: pre-wrap; }
+  .sign { display: flex; gap: 30px; margin-top: 26px; font-size: 8.5pt; }
+  .sign div { flex: 1; border-top: 1px solid #000; padding-top: 4px; color: #444; }
+  .foot { margin-top: 18px; font-size: 7pt; color: #666; display: flex; justify-content: space-between; }
 </style></head><body>
-  <div class="kicker">Vialintia — Formula sheet${no ? ` — N°${no}` : ''}</div>
-  <h1>${esc(formula.name)}</h1>
-  <div class="meta">${esc(versionLabel)} · ${product} ${fmt(formula.concentration, 1)}% · ${formula.status} · ${new Date().toLocaleDateString('en-GB')}${formula.tags.length ? ' · ' + formula.tags.map(esc).join(', ') : ''}</div>
-  ${formula.description ? `<div class="notes" style="margin:-6px 0 14px">${esc(formula.description)}</div>` : ''}
-  <div class="grid">
-    <div class="box"><div class="k">Concentrate</div><div class="v">${fmt(calc.totalGrams, 3)} ${unit === 'g' ? 'g' : unit}</div></div>
-    <div class="box"><div class="k">Materials</div><div class="v">${calc.materialCount}</div></div>
-    <div class="box"><div class="k">Batch concentrate</div><div class="v">${fmt(calc.batch.concentrateG, 2)} g</div></div>
-    <div class="box"><div class="k">Alcohol</div><div class="v">${fmt(calc.batch.alcoholG, 2)} g · ${fmt(calc.batch.alcoholMl, 1)} ml</div></div>
-    <div class="box"><div class="k">Cost / kg conc.</div><div class="v">${calc.costPerKg > 0 ? settings.currency + ' ' + fmt(calc.costPerKg, 2) : '—'}</div></div>
+  <div class="head">
+    <div>
+      <div class="doc">Formula sheet</div>
+      <h1>${esc(formula.name)}</h1>
+    </div>
+    <table class="ref">
+      ${no ? `<tr><td>Code</td><td>N° ${esc(no)}</td></tr>` : ''}
+      <tr><td>Version</td><td>${esc(versionLabel)}</td></tr>
+      <tr><td>Date</td><td>${new Date().toLocaleDateString('en-GB')}</td></tr>
+    </table>
   </div>
-  <div style="margin-bottom:12px">${pyramid}</div>
-  <table>
-    <thead><tr><th class="l">Material</th><th class="l">Note</th><th>Amount (${unit})</th><th>Dilution</th><th>Weighed %</th><th>% in product</th><th>IFRA %</th><th>Batch g</th></tr></thead>
+
+  <table class="info">${infoHtml}</table>
+
+  <h2>Composition</h2>
+  <table class="comp">
+    <thead><tr>
+      <th class="c">No.</th><th class="l">Material</th><th class="l">CAS</th><th class="c">Note</th><th class="c">Dilution</th>
+      <th>Amount (${unit})</th><th>% weighed</th><th>% in product</th><th>IFRA max %</th><th>Batch (g)</th><th class="c">✓</th>
+    </tr></thead>
     <tbody>${rows}</tbody>
-    <tfoot><tr><td class="l">Total</td><td></td><td>${fmtSmart(calc.rows.reduce((s, r) => s + r.row.amount, 0))}</td><td></td><td>100.000</td><td>${fmt(formula.concentration, 2)}</td><td></td><td>${fmt(calc.batch.concentrateG, 3)}</td></tr></tfoot>
+    <tfoot><tr>
+      <td></td><td class="l">Total</td><td></td><td></td><td></td>
+      <td>${fmtSmart(amountSum)}</td><td>100.000</td><td>${fmt(formula.concentration, 2)}</td><td></td><td>${fmt(b.concentrateG, 3)}</td><td></td>
+    </tr></tfoot>
   </table>
-  ${ifraOver.length ? `<div class="warn"><b>IFRA:</b> ${ifraOver.map((e) => `${esc(e.material.name)} ${fmtSmart(e.productPct)}% (limit ${fmtSmart(e.limit)}%)`).join(' · ')}</div>` : ''}
-  ${calc.ifra.maxConcentration != null ? `<div class="meta">Max concentration within entered IFRA limits: ${fmt(calc.ifra.maxConcentration, 2)}%</div>` : ''}
-  <div class="foot"><span>Generated with Vialintia</span><span>IFRA values as entered by the user — verify against the current IFRA Standards.</span></div>
+
+  <div class="summary">
+    <b>Structure:</b> ${structure}<br>
+    ${calc.costPerKg > 0 ? `<b>Cost:</b> ${cur} ${fmt(calc.costPerKg, 2)} / kg concentrate${b.costPerBottle != null ? ` · ${cur} ${fmt(b.costPerBottle, 2)} per bottle` : ''} · batch ${cur} ${fmt(b.costTotal, 2)}<br>` : ''}
+    <b>IFRA (Cat. 4):</b> ${
+      calc.ifra.entries.length === 0
+        ? 'no limits entered for the materials used'
+        : over.length
+          ? `${over.length} material${over.length > 1 ? 's' : ''} above the entered limit`
+          : 'all materials within entered limits'
+    }${calc.ifra.maxConcentration != null ? ` · max. concentration ${fmt(calc.ifra.maxConcentration, 2)} %` : ''}
+  </div>
+  ${over.length ? `<div class="warn"><b>! Above IFRA limit:</b> ${over.map((e) => `${esc(e.material.name)} – ${fmtSmart(e.productPct)} % in product (limit ${fmtSmart(e.limit)} %)`).join('; ')}</div>` : ''}
+
+  <h2>Notes</h2>
+  <div class="notes">${esc([formula.description, version?.comment].filter(Boolean).join('\n\n'))}</div>
+
+  <div class="sign"><div>Prepared by</div><div>Date</div><div>Checked</div></div>
+  <div class="foot"><span>Vialintia</span><span>IFRA values as entered by the user — verify against the current IFRA Standards.</span></div>
 </body></html>`
 }
