@@ -3,6 +3,7 @@ import { DEFAULT_FAMILIES, DEFAULT_NOTE_COLORS, DEFAULT_SETTINGS, LEGACY_DEFAULT
 import type { AppData, Formula, FormulaRow, FormulaVersion, Material, Settings } from '@shared/types'
 import { SEED_VERSION, seedMaterials, upgradeSeedLibrary } from '@/data/seedMaterials'
 import { uid } from '@/lib/id'
+import { mergeImport, type MergeStats } from '@/lib/merge'
 import { buildAccordIndex, type AccordIndex } from '@/lib/calc'
 
 interface History {
@@ -33,6 +34,7 @@ interface State {
 
   updateSettings(patch: Partial<Settings>): void
   replaceAll(data: Partial<AppData> & { seedVersion?: number }): void
+  importData(data: Partial<AppData> & { refMaterials?: Material[] }): MergeStats
   resetAll(): void
 }
 
@@ -297,6 +299,25 @@ export const useStore = create<State>((set, get) => ({
       settings: { ...(data.settings ? normalizeSettings(data.settings) : get().settings), seedVersion: SEED_VERSION },
       history: {}
     })
+  },
+
+  importData(data) {
+    const s = get()
+    const merged = mergeImport(
+      { materials: s.materials, formulas: s.formulas },
+      {
+        materials: Array.isArray(data.materials) ? data.materials : undefined,
+        refMaterials: Array.isArray(data.refMaterials) ? data.refMaterials : undefined,
+        formulas: Array.isArray(data.formulas) ? data.formulas.map(normalizeFormula) : undefined
+      }
+    )
+    set({
+      materials: merged.materials,
+      formulas: merged.formulas,
+      settings: data.settings ? { ...normalizeSettings(data.settings), seedVersion: s.settings.seedVersion } : s.settings,
+      history: {}
+    })
+    return merged.stats
   },
 
   resetAll() {

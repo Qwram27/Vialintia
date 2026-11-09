@@ -19,6 +19,7 @@ export interface Material {
   description?: string
   type: MaterialType
   accordFormulaId?: string // set when this material is an accord built from a formula
+  aliasIds?: string[] // ids the same material had on another device (resolved on import)
   createdAt: string
   updatedAt: string
 }

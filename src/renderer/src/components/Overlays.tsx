@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { useUi } from '@/store/ui'
 
 export function ConfirmHost() {
@@ -20,8 +21,9 @@ export function ConfirmHost() {
     req!.resolve(ok)
     setConfirm(null)
   }
-  return (
-    <div className="overlay" onMouseDown={() => done(false)}>
+  // Portal + higher layer, so the dialog always sits above bottom sheets / pickers.
+  return createPortal(
+    <div className="overlay confirm-overlay" onMouseDown={() => done(false)}>
       <div className="modal" onMouseDown={(e) => e.stopPropagation()}>
         <h3>{req.title}</h3>
         <p>{req.message}</p>
@@ -34,7 +36,8 @@ export function ConfirmHost() {
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 

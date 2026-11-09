@@ -975,3 +975,7 @@ svg text { font-family: var(--mono); }
   .crumb > :last-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .asm-row .nm { white-space: normal; overflow: visible; }
 }
+
+/* confirm dialogs sit above sheets (200) and the phone picker (260) */
+.confirm-overlay { z-index: 400; }
+.toasts { z-index: 450; }

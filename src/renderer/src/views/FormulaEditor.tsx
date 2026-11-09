@@ -10,14 +10,14 @@ import { uid } from '@/lib/id'
 import { NumberInput } from '@/components/NumberInput'
 import { MaterialPicker } from '@/components/MaterialPicker'
 import { IfraBadge, statusColor } from '@/components/Ifra'
-import { EvolutionChart, FamilyDonut, NoteBar, StructureChart } from '@/components/Charts'
+import { EvolutionChart, FamilyDonut, StructureChart } from '@/components/Charts'
 import { Seg } from '@/components/Seg'
 import { catalogNo, seasonCode, shortDate } from '@/lib/archive'
 import { Stars } from '@/components/Overlays'
 import { Sheet } from '@/components/Sheet'
 import { useIsMobile } from '@/lib/useMobile'
 import {
-  IconAlert, IconAnalyze, IconCheck, IconScale, IconCopy, IconDownload, IconFile, IconGrip, IconPlus,
+  IconAlert, IconAnalyze, IconCheck, IconPercent, IconCopy, IconDownload, IconFile, IconGrip, IconPlus,
   IconRedo, IconSort, IconTrash, IconUndo, IconX
 } from '@/components/Icons'
 
@@ -82,7 +82,6 @@ export function FormulaEditor({ id }: { id: string }) {
       <Header formula={formula} update={update} calc={calc} versionLabel={version.label} canUndo={!!history?.past.length} canRedo={!!history?.future.length} onUndo={() => undo(id)} onRedo={() => redo(id)} settings={settings}>
         <Versions formula={formula} update={update} />
       </Header>
-      <Metrics formula={formula} calc={calc} settings={settings} />
 
       <div className="workspace">
         <div className="card pane">
@@ -154,7 +153,7 @@ function EditorFoot({
   return (
     <div className="editor-foot">
       <button className="btn" onClick={() => setScaling(true)} disabled={calc.totalGrams <= 0}>
-        <IconScale /> Scale
+        <IconPercent /> Scale
       </button>
       {accord ? (
         <button className="btn" onClick={() => navigate('/library')} title="This formula is in Materials as an accord">
@@ -353,7 +352,7 @@ function Header({
           <IconRedo />
         </button>
         <button className="btn btn-primary" title="Weigh this formula step by step" onClick={() => navigate(`/formula/${formula.id}/assemble`)}>
-          <IconScale /> Assemble fragrance
+          Assemble fragrance
         </button>
         <button
           className="btn btn-ghost btn-icon"
@@ -952,78 +951,6 @@ function MobileComposition({
         </Sheet>
       )}
     </>
-  )
-}
-
-// ---------------------------------------------------------------- metrics strip
-function Metrics({ formula, calc, settings }: { formula: Formula; calc: FormulaCalc; settings: Settings }) {
-  const b = calc.batch
-  const cur = settings.currency
-  const over = calc.ifra.entries.filter((e) => e.status === 'over').length
-  const near = calc.ifra.entries.filter((e) => e.status === 'near').length
-  const ifraState = calc.ifra.entries.length === 0 ? 'none' : over ? 'over' : near ? 'near' : 'ok'
-  const noteTotal = calc.byNote.top + calc.byNote.heart + calc.byNote.base
-  const product = formula.productType === 'custom' ? 'Custom' : PRODUCT_PRESETS[formula.productType].label
-  return (
-    <div className="metrics">
-      <div className="metric">
-        <div className="k">Concentrate</div>
-        <div className="v">
-          {fmt(calc.totalGrams, calc.totalGrams < 10 ? 3 : 2)}
-          <small>{formula.unit === 'parts' ? 'pt' : 'g'}</small>
-        </div>
-        <div className="s">{calc.materialCount} materials</div>
-      </div>
-      <div className="metric">
-        <div className="k">Product</div>
-        <div className="v">
-          {fmt(formula.concentration, 1)}
-          <small>%</small>
-        </div>
-        <div className="s">{product}</div>
-      </div>
-      <div className="metric">
-        <div className="k">Batch</div>
-        <div className="v">
-          {fmt(b.concentrateG, 2)}
-          <small>g</small>
-        </div>
-        <div className="s">+ {fmt(b.alcoholMl, 1)} ml alcohol</div>
-      </div>
-      <div className="metric">
-        <div className="k">Cost / kg</div>
-        <div className="v">
-          {calc.costPerKg > 0 ? (
-            <>
-              {cur}
-              {fmt(calc.costPerKg, 0)}
-            </>
-          ) : (
-            '—'
-          )}
-        </div>
-        <div className="s">{b.costPerBottle != null && b.costPerBottle > 0 ? `${cur}${fmt(b.costPerBottle, 2)} / bottle` : 'no prices'}</div>
-      </div>
-      <div className="metric metric-wide">
-        <div className="k">Structure</div>
-        <div className="mstruct">
-          {NOTE_ORDER.map((n) => (
-            <span key={n}>
-              <i style={{ background: settings.noteColors[n] }} />
-              {NOTE_LABELS[n].slice(0, 1)} {noteTotal > 0 ? fmt((calc.byNote[n] / noteTotal) * 100, 0) : '—'}
-            </span>
-          ))}
-        </div>
-        <NoteBar byNote={calc.byNote} settings={settings} />
-      </div>
-      <div className={`metric metric-ifra is-${ifraState}`}>
-        <div className="k">IFRA</div>
-        <div className="v">{ifraState === 'none' ? '—' : ifraState === 'over' ? `! ${over}` : ifraState === 'near' ? '◐' : '✓'}</div>
-        <div className="s">
-          {ifraState === 'none' ? 'no limits set' : calc.ifra.maxConcentration != null ? `max ${fmt(calc.ifra.maxConcentration, 2)}%` : 'within limits'}
-        </div>
-      </div>
-    </div>
   )
 }
 
