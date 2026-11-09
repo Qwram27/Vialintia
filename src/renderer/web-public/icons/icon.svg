@@ -1,10 +1,9 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
-  <!-- Vialintia mark: formula sheet with a V and two rule lines -->
-  <rect width="512" height="512" fill="#000"/>
-  <g transform="translate(-6 0)" fill="none" stroke-linecap="square" stroke-linejoin="miter">
-    <path d="M144 88 H316 L380 152 V424 H144 Z" stroke="#ececec" stroke-width="12"/>
-    <path d="M316 88 V152 H380" stroke="#ececec" stroke-width="12"/>
-    <path d="M190 180 L236 300 L282 180" stroke="#ececec" stroke-width="22"/>
-    <path d="M190 352 H334 M190 386 H300" stroke="#6a6a6a" stroke-width="12"/>
+  <!-- Vialintia mark (phone / web): white on a transparent background -->
+  <g transform="translate(-6 0)" fill="none" stroke="#ffffff" stroke-linecap="square" stroke-linejoin="miter">
+    <path d="M144 88 H316 L380 152 V424 H144 Z" stroke-width="12"/>
+    <path d="M316 88 V152 H380" stroke-width="12"/>
+    <path d="M190 180 L236 300 L282 180" stroke-width="22"/>
+    <path d="M190 352 H334 M190 386 H300" stroke-width="12"/>
   </g>
 </svg>

@@ -89,3 +89,22 @@ export function toast(text: string) {
 export function confirmDialog(title: string, message: string, confirmLabel = 'Delete'): Promise<boolean> {
   return new Promise((resolve) => useUi.getState().setConfirm({ title, message, confirmLabel, resolve }))
 }
+
+// ---------- progress (long tasks such as PDF export) ----------
+export interface Progress {
+  label: string
+  value: number | null // 0..1, null = indeterminate
+}
+export const useProgress = create<{ progress: Progress | null }>(() => ({ progress: null }))
+export function setProgress(p: Progress | null) {
+  useProgress.setState({ progress: p })
+}
+/** Run an async task with the progress bar shown; always clears it afterwards. */
+export async function withProgress<T>(label: string, task: (step: (value: number | null, label?: string) => void) => Promise<T>): Promise<T> {
+  setProgress({ label, value: null })
+  try {
+    return await task((value, l) => setProgress({ label: l ?? label, value }))
+  } finally {
+    setProgress(null)
+  }
+}

@@ -351,3 +351,24 @@ describe('import merge', () => {
     expect(out.stats.formulasKept).toBe(1)
   })
 })
+
+// ---------------------------------------------------------------- formula CSV import
+import { csvToFormula } from './importFormula'
+
+describe('formula CSV import', () => {
+  it('reads the formula CSV format written by the app', () => {
+    const csv = [
+      'Material,CAS,Family,Note,Amount (g),Dilution %,Solvent,Weighed %,Neat % in concentrate,% in product,IFRA limit %,Batch (g)',
+      'Hedione,24851-98-7,Floral,Heart,10,100,,83.3,83.3,14.2,,5.8',
+      'Citral,5392-40-5,Citrus,Top,2,10,EtOH,16.7,1.6,0.28,0.6,1.1',
+      '',
+      'Total,,,,12,,,100,,,,6.97',
+      'Concentration %,17'
+    ].join('\n')
+    const back = csvToFormula(csv, 'My scent - V1.csv', settings)!
+    expect(back.formula.name).toBe('My scent')
+    expect(back.formula.concentration).toBe(17)
+    expect(back.formula.versions[0].rows.map((r) => [r.amount, r.dilution, r.solvent])).toEqual([[10, 100, undefined], [2, 10, 'EtOH']])
+    expect(back.refMaterials.map((m) => [m.name, m.cas, m.note, m.family])).toEqual([['Hedione', '24851-98-7', 'heart', 'floral'], ['Citral', '5392-40-5', 'top', 'citrus']])
+  })
+})

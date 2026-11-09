@@ -1,4 +1,5 @@
 import type { AppData, StoreApi } from '@shared/types'
+import { confirmDialog, withProgress } from '@/store/ui'
 
 /**
  * Browser implementation of the Electron preload API (used by the iPhone / PWA build).
@@ -85,17 +86,14 @@ const MIME: Record<string, string> = {
 
 const isTouch = () => matchMedia('(pointer: coarse)').matches
 
-/** Save a text file: iOS share sheet (→ Save to Files) when available, else a normal download. */
-async function exportText(data: string, defaultName: string, ext: string): Promise<string | null> {
-  const type = MIME[ext] ?? 'text/plain'
-  const name = defaultName.toLowerCase().endsWith(`.${ext}`) ? defaultName : `${defaultName}.${ext}`
-  const file = new File([data], name, { type })
+/** Save a file: iOS share sheet (→ Save to Files) when available, else a normal download. */
+async function saveFile(file: File): Promise<string | null> {
   const nav = navigator as Navigator & { canShare?: (d: ShareData) => boolean }
   if (isTouch() && nav.canShare?.({ files: [file] })) {
     try {
       // Files only — any title/text is saved by iOS as extra "Text" files next to the export.
       await nav.share({ files: [file] })
-      return name
+      return file.name
     } catch (err) {
       if ((err as DOMException)?.name === 'AbortError') return null
       // fall through to download
@@ -104,13 +102,19 @@ async function exportText(data: string, defaultName: string, ext: string): Promi
   const url = URL.createObjectURL(file)
   const a = document.createElement('a')
   a.href = url
-  a.download = name
+  a.download = file.name
   a.rel = 'noopener'
   document.body.appendChild(a)
   a.click()
   a.remove()
   setTimeout(() => URL.revokeObjectURL(url), 30_000)
-  return name
+  return file.name
+}
+
+async function exportText(data: string, defaultName: string, ext: string): Promise<string | null> {
+  const type = MIME[ext] ?? 'text/plain'
+  const name = defaultName.toLowerCase().endsWith(`.${ext}`) ? defaultName : `${defaultName}.${ext}`
+  return saveFile(new File([data], name, { type }))
 }
 
 function importText(ext: string): Promise<string | null> {
@@ -118,7 +122,8 @@ function importText(ext: string): Promise<string | null> {
     const input = document.createElement('input')
     input.type = 'file'
     // iOS greys out files whose type it cannot match, so stay permissive.
-    input.accept = ext === 'json' ? '.json,application/json,text/plain' : '.csv,text/csv,text/plain,text/comma-separated-values'
+    const accept: Record<string, string> = { json: '.json,application/json', csv: '.csv,text/csv,text/comma-separated-values' }
+    input.accept = [...ext.split(',').map((e) => accept[e.trim()] ?? `.${e.trim()}`), 'text/plain'].join(',')
     input.style.display = 'none'
     let done = false
     const finish = (v: string | null) => {
@@ -139,45 +144,54 @@ function importText(ext: string): Promise<string | null> {
 }
 
 /**
- * Print the formula sheet. The sheet is mounted in the current document and only shown in print
- * (iOS prints the whole page, popups are unreliable in Home Screen apps). On iPhone the print sheet
- * offers Share → Save to Files as PDF.
+ * Build a real PDF of the formula sheet (no print dialog — window.print() is unreliable in iOS
+ * Home Screen apps): render the sheet HTML in an off-screen A4-wide frame, rasterise it with
+ * html2canvas and lay it out on A4 pages with jsPDF. Shows the progress bar while working.
  */
-function printPdf(html: string, defaultName: string): Promise<string | null> {
-  const doc = new DOMParser().parseFromString(html, 'text/html')
-  const css = Array.from(doc.querySelectorAll('style'))
-    .map((s) => s.textContent ?? '')
-    .join('\n')
-    // scope the sheet's own body rules to the print root
-    .replace(/(^|[\s,}])body\s*\{/g, '$1#print-root {')
-  document.getElementById('print-root')?.remove()
-  document.getElementById('print-style')?.remove()
-  const style = document.createElement('style')
-  style.id = 'print-style'
-  style.textContent = `@media print { ${css} }`
-  const root = document.createElement('div')
-  root.id = 'print-root'
-  root.innerHTML = doc.body.innerHTML
-  document.head.appendChild(style)
-  document.body.appendChild(root)
-  const prevTitle = document.title
-  document.title = defaultName.replace(/\.pdf$/i, '')
-  const cleanup = () => {
-    document.title = prevTitle
-    root.remove()
-    style.remove()
-    window.removeEventListener('afterprint', cleanup)
-  }
-  window.addEventListener('afterprint', cleanup)
-  return new Promise((resolve) => {
-    // let layout settle before opening the print sheet
-    setTimeout(() => {
-      window.print()
-      // If afterprint never fires (some iOS versions), the sheet stays mounted but hidden on
-      // screen and is replaced by the next print.
-      resolve(null)
-    }, 60)
+async function printPdf(html: string, defaultName: string): Promise<string | null> {
+  const name = defaultName.toLowerCase().endsWith('.pdf') ? defaultName : `${defaultName}.pdf`
+  const file = await withProgress('Exporting PDF', async (step) => {
+    const [{ default: html2canvas }, { jsPDF }] = await Promise.all([import('html2canvas'), import('jspdf')])
+    step(0.15)
+    const A4_PX = 794 // 210 mm at 96 dpi
+    const frame = document.createElement('iframe')
+    frame.setAttribute('aria-hidden', 'true')
+    frame.style.cssText = `position:fixed;left:-10000px;top:0;width:${A4_PX}px;height:40px;border:0;background:#fff`
+    document.body.appendChild(frame)
+    try {
+      const doc = frame.contentDocument!
+      doc.open()
+      doc.write(html.replace('</head>', '<style>html,body{background:#fff}body{padding:48px}</style></head>'))
+      doc.close()
+      await new Promise((r) => setTimeout(r, 120))
+      step(0.3)
+      // capture only the sheet's own height (the frame is kept short so nothing pads it out)
+      const height = Math.ceil(doc.body.scrollHeight)
+      const canvas = await html2canvas(doc.body, { scale: 2, backgroundColor: '#ffffff', windowWidth: A4_PX, windowHeight: height, height, useCORS: false, logging: false })
+      step(0.75)
+      const pdf = new jsPDF({ unit: 'pt', format: 'a4', compress: true })
+      const pageW = pdf.internal.pageSize.getWidth()
+      const pageH = pdf.internal.pageSize.getHeight()
+      const pxPerPt = canvas.width / pageW
+      const slicePx = Math.floor(pageH * pxPerPt)
+      for (let y = 0, page = 0; y < canvas.height; y += slicePx, page++) {
+        const h = Math.min(slicePx, canvas.height - y)
+        const slice = document.createElement('canvas')
+        slice.width = canvas.width
+        slice.height = h
+        slice.getContext('2d')!.drawImage(canvas, 0, y, canvas.width, h, 0, 0, canvas.width, h)
+        if (page > 0) pdf.addPage()
+        pdf.addImage(slice.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, pageW, h / pxPerPt)
+        step(0.75 + 0.2 * Math.min(1, (y + h) / canvas.height))
+      }
+      return new File([pdf.output('blob')], name, { type: 'application/pdf' })
+    } finally {
+      frame.remove()
+    }
   })
+  // Sharing needs a fresh tap on iOS — ask for it once the file is ready.
+  if (isTouch() && !(await confirmDialog('PDF ready', name, 'Save PDF'))) return null
+  return saveFile(file)
 }
 
 export function createWebApi(): StoreApi {

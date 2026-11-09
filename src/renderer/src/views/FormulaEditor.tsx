@@ -3,7 +3,8 @@ import { createPortal } from 'react-dom'
 import type { AmountUnit, Formula, FormulaRow, FormulaStatus, Material, ProductType, Settings, TestNote, TestPhase, TestStage } from '@shared/types'
 import { NOTE_LABELS, NOTE_ORDER, PRODUCT_PRESETS } from '@shared/defaults'
 import { currentVersion, familyById, useAccordIndex, useMaterialMap, useStore, withRows } from '@/store/store'
-import { confirmDialog, navigate, toast } from '@/store/ui'
+import { confirmDialog, navigate, toast, withProgress } from '@/store/ui'
+import { isWeb } from '@/platform'
 import { computeFormula, fmt, fmtSmart, inkOn, roundToStep, rowIfraEntry, scaleRows, type FormulaCalc } from '@/lib/calc'
 import { formulaToCsv, formulaToPdfHtml } from '@/lib/exports'
 import { uid } from '@/lib/id'
@@ -170,6 +171,18 @@ function EditorFoot({
       </button>
       <button
         className="btn"
+        title="Export this formula (with the materials it uses) to import on another device"
+        onClick={async () => {
+          const used = new Set(formula.versions.flatMap((v) => v.rows.map((r) => r.materialId)))
+          const file = { app: 'Vialintia', kind: 'formulas', version: 2, formulas: [formula], refMaterials: materials.filter((m) => used.has(m.id)) }
+          const p = await window.vialintia.exportJson(JSON.stringify(file, null, 2), `${fileBase}.json`)
+          if (p) toast('Formula exported')
+        }}
+      >
+        <IconDownload /> Export
+      </button>
+      <button
+        className="btn"
         title="Export CSV"
         onClick={async () => {
           const p = await window.vialintia.exportText(formulaToCsv(formula, calc, settings), `${fileBase}.csv`, 'csv')
@@ -182,7 +195,9 @@ function EditorFoot({
         className="btn"
         title="Export PDF formula sheet"
         onClick={async () => {
-          const p = await window.vialintia.printPdf(formulaToPdfHtml(formula, versionLabel, calc, settings, catalogNo(formula, all)), `${fileBase}.pdf`)
+          const html = formulaToPdfHtml(formula, versionLabel, calc, settings, catalogNo(formula, all))
+          // web builds its own progress; the desktop app prints via Electron — show the bar meanwhile
+          const p = isWeb ? await window.vialintia.printPdf(html, `${fileBase}.pdf`) : await withProgress('Exporting PDF', () => window.vialintia.printPdf(html, `${fileBase}.pdf`))
           if (p) toast('PDF saved')
         }}
       >

@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { useUi } from '@/store/ui'
+import { useProgress, useUi } from '@/store/ui'
 
 export function ConfirmHost() {
   const req = useUi((s) => s.confirmReq)
@@ -70,5 +70,26 @@ export function Stars({ value, onChange }: { value: number; onChange?: (v: numbe
         </button>
       ))}
     </span>
+  )
+}
+
+/** Blocking progress card with a flat bar (determinate when a value is known). */
+export function ProgressHost() {
+  const p = useProgress((s) => s.progress)
+  if (!p) return null
+  return createPortal(
+    <div className="overlay confirm-overlay progress-overlay">
+      <div className="modal progress-card" role="progressbar" aria-label={p.label} aria-valuenow={p.value == null ? undefined : Math.round(p.value * 100)}>
+        <div className="row">
+          <span className="label">{p.label}</span>
+          <div className="spacer" />
+          <span className="small muted">{p.value == null ? '' : `${Math.round(p.value * 100)}%`}</span>
+        </div>
+        <div className={`progress-track${p.value == null ? ' indeterminate' : ''}`}>
+          <div style={p.value == null ? undefined : { width: `${Math.max(2, p.value * 100)}%` }} />
+        </div>
+      </div>
+    </div>,
+    document.body
   )
 }

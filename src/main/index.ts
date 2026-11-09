@@ -99,9 +99,10 @@ function registerIpc(): void {
   })
 
   ipcMain.handle('file:importText', async (_e, ext: string) => {
+    const exts = ext.split(',').map((e) => e.trim()).filter(Boolean)
     const res = await dialog.showOpenDialog(mainWindow!, {
       properties: ['openFile'],
-      filters: [{ name: ext.toUpperCase(), extensions: [ext] }]
+      filters: [{ name: exts.map((e) => e.toUpperCase()).join(' / '), extensions: exts }]
     })
     if (res.canceled || !res.filePaths[0]) return null
     return fs.readFile(res.filePaths[0], 'utf8')
