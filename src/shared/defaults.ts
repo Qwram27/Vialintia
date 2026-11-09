@@ -55,7 +55,7 @@ export const DEFAULT_SETTINGS: Settings = {
   ethanolDensity: 0.79,
   alcoholPricePerL: 0,
   currency: '€',
-  nearLimitRatio: 0.8,
+  nearLimitRatio: 0.9,
   noteColors: { ...DEFAULT_NOTE_COLORS },
   families: DEFAULT_FAMILIES.map((f) => ({ ...f })),
   solvents: ['EtOH', 'DPG', 'IPM', 'TEC', 'BB', 'DEP']

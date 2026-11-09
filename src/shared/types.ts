@@ -93,6 +93,7 @@ export interface Settings {
   noteColors: Record<NoteLevel, string>
   families: Family[]
   solvents: string[]
+  prefsVersion?: number // settings migrations already applied
   seedVersion?: number // starter-library version already merged into this library
 }
 

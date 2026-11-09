@@ -57,8 +57,13 @@ export function normalizeSettings(s: Partial<Settings> | undefined): Settings {
   for (const def of DEFAULT_FAMILIES) {
     if (!families.some((f) => f.id === def.id)) families.push({ ...def })
   }
+  // prefs v1: IFRA "near limit" warning default moved 80% → 90% (keep any value the user chose).
+  const prefsVersion = s?.prefsVersion ?? 0
+  const nearLimitRatio = s && prefsVersion < 1 && s.nearLimitRatio === 0.8 ? 0.9 : base.nearLimitRatio
   return {
     ...base,
+    prefsVersion: 1,
+    nearLimitRatio,
     noteColors,
     families,
     solvents: Array.isArray(s?.solvents) && s!.solvents.length ? s!.solvents : DEFAULT_SETTINGS.solvents
