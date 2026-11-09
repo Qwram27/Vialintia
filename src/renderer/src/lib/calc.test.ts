@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_SETTINGS } from '@shared/defaults'
 import type { Formula, Material } from '@shared/types'
-import { buildAccordIndex, computeFormula, diffVersions, evolution, ifraStatus, parseNum, roundToStep, rowIfraEntry, scaleRows } from './calc'
+import { buildAccordIndex, computeFormula, diffVersions, evolution, ifraStatus, parseNum, reduceAccordRow, roundToStep, rowIfraEntry, scaleRows } from './calc'
 import { SEED_VERSION, seedMaterials, upgradeSeedLibrary } from '@/data/seedMaterials'
 
 const now = new Date().toISOString()
@@ -370,5 +370,57 @@ describe('formula CSV import', () => {
     expect(back.formula.concentration).toBe(17)
     expect(back.formula.versions[0].rows.map((r) => [r.amount, r.dilution, r.solvent])).toEqual([[10, 100, undefined], [2, 10, 'EtOH']])
     expect(back.refMaterials.map((m) => [m.name, m.cas, m.note, m.family])).toEqual([['Hedione', '24851-98-7', 'heart', 'floral'], ['Citral', '5392-40-5', 'top', 'citrus']])
+  })
+})
+
+describe('reduce accord', () => {
+  // Accord: 6 g of a (neat) + 4 g of b at 10% in DPG.
+  const accord = formula({
+    id: 'acc',
+    versions: [{ id: 'v', label: 'V1', createdAt: now, rows: [
+      { id: 'r1', materialId: 'a', amount: 6, dilution: 100 },
+      { id: 'r2', materialId: 'b', amount: 4, dilution: 10, solvent: 'DPG' }
+    ] }]
+  })
+  let n = 0
+  const id = () => `n${++n}`
+
+  it('replaces the accord row with constituents in real amounts, in place', () => {
+    const rows = [
+      { id: 'x', materialId: 'c', amount: 1, dilution: 100 },
+      { id: 'acc-row', materialId: 'ACC', amount: 5, dilution: 100 },
+      { id: 'y', materialId: 'd', amount: 2, dilution: 100 }
+    ]
+    const out = reduceAccordRow(rows, 'acc-row', 'g', accord, settings, id)!
+    expect(out.map((r) => r.materialId)).toEqual(['c', 'a', 'b', 'd'])
+    expect(out[1]).toMatchObject({ amount: 3, dilution: 100 })
+    expect(out[2]).toMatchObject({ amount: 2, dilution: 10, solvent: 'DPG' })
+    expect(rows[0].amount).toBe(1) // input untouched
+  })
+
+  it('folds the accord dilution in and keeps neat totals', () => {
+    const rows = [{ id: 'acc-row', materialId: 'ACC', amount: 10, dilution: 50, solvent: 'EtOH' }]
+    const out = reduceAccordRow(rows, 'acc-row', 'g', accord, settings, id)!
+    expect(out[0]).toMatchObject({ materialId: 'a', amount: 6, dilution: 50, solvent: 'EtOH' })
+    expect(out[1]).toMatchObject({ materialId: 'b', amount: 4, dilution: 5, solvent: 'DPG' })
+    const weighed = out.reduce((s, r) => s + r.amount, 0)
+    expect(weighed).toBeCloseTo(10)
+  })
+
+  it('merges into an existing row of the same material and dilution', () => {
+    const rows = [
+      { id: 'a-row', materialId: 'a', amount: 1, dilution: 100 },
+      { id: 'acc-row', materialId: 'ACC', amount: 10, dilution: 100 }
+    ]
+    const out = reduceAccordRow(rows, 'acc-row', 'g', accord, settings, id)!
+    expect(out).toHaveLength(2)
+    expect(out[0]).toMatchObject({ id: 'a-row', amount: 7 })
+    expect(rows[0].amount).toBe(1)
+  })
+
+  it('converts to drops in a drops formula', () => {
+    const rows = [{ id: 'acc-row', materialId: 'ACC', amount: 10, dilution: 100 }]
+    const out = reduceAccordRow(rows, 'acc-row', 'drops', accord, settings, id)!
+    expect(out.reduce((s, r) => s + r.amount, 0)).toBeCloseTo(10)
   })
 })

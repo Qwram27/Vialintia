@@ -8,7 +8,7 @@ import { Assemble } from '@/views/Assemble'
 import { Library } from '@/views/Library'
 import { Compare } from '@/views/Compare'
 import { SettingsView } from '@/views/Settings'
-import { ConfirmHost, ProgressHost, ToastHost } from '@/components/Overlays'
+import { ConfirmHost, ContextMenuHost, ProgressHost, ToastHost } from '@/components/Overlays'
 import { useIsMobile } from '@/lib/useMobile'
 import { APP_VERSION } from '@shared/version'
 import { IconAnalyze, IconGear, IconPowder, IconSheet, LogoMark } from '@/components/Icons'
@@ -126,6 +126,7 @@ export function App() {
         </nav>
       )}
       <ConfirmHost />
+      <ContextMenuHost />
       <ProgressHost />
       <ToastHost />
     </div>

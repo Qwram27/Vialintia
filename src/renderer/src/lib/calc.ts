@@ -431,3 +431,55 @@ export function inkOn(hex: string): string {
   const L = 0.2126 * lin((n >> 16) & 255) + 0.7152 * lin((n >> 8) & 255) + 0.0722 * lin(n & 255)
   return L > 0.18 ? '#0d0f0e' : '#eef3ef'
 }
+
+// ---------------------------------------------------------------- accord reduction
+/**
+ * Replace an accord row with the accord formula's own rows (one level; nested accords stay as
+ * accord rows and can be reduced again). Amounts are real: each constituent gets its share of the
+ * weighed accord mass, and the accord row's dilution is folded into each constituent's dilution,
+ * so total weighed mass and every neat amount stay exactly the same. Constituents that already
+ * appear in the formula with the same dilution and solvent are added to that row.
+ */
+export function reduceAccordRow(
+  rows: FormulaRow[],
+  rowId: string,
+  unit: Formula['unit'],
+  accord: Formula,
+  settings: Settings,
+  newId: () => string
+): FormulaRow[] | null {
+  const idx = rows.findIndex((r) => r.id === rowId)
+  const row = rows[idx]
+  const v = accord.versions.find((x) => x.id === accord.currentVersionId) ?? accord.versions[accord.versions.length - 1]
+  if (!row || !v?.rows.length) return null
+  const grams = v.rows.map((r) => rowGrams(r, accord.unit, settings))
+  const total = grams.reduce((a, b) => a + b, 0)
+  if (!(total > 0)) return null
+  const weighedG = rowGrams(row, unit, settings)
+  const accordDil = clampPct(row.dilution) / 100
+  const toUnit = (g: number) => (unit === 'drops' && settings.dropMassG > 0 ? g / settings.dropMassG : g)
+  const round = (x: number) => Number(x.toFixed(4))
+  const key = (r: FormulaRow) => `${r.materialId}|${round(r.dilution)}|${r.dilution < 100 ? r.solvent ?? '' : ''}`
+
+  const rest = rows.filter((r) => r.id !== rowId).map((r) => ({ ...r }))
+  const touched = new Set<FormulaRow>()
+  const inserted: FormulaRow[] = []
+  v.rows.forEach((r, i) => {
+    if (!(grams[i] > 0)) return
+    const dilution = round(clampPct(r.dilution) * accordDil)
+    const next: FormulaRow = {
+      id: newId(),
+      materialId: r.materialId,
+      amount: toUnit(weighedG * (grams[i] / total)),
+      dilution: dilution > 0 ? dilution : 100,
+      solvent: dilution < 100 ? (r.dilution < 100 ? r.solvent : undefined) ?? row.solvent ?? 'EtOH' : undefined
+    }
+    const same = [...rest, ...inserted].find((x) => key(x) === key(next))
+    const target = same ?? next
+    if (same) same.amount += next.amount
+    else inserted.push(next)
+    touched.add(target)
+  })
+  touched.forEach((r) => (r.amount = round(r.amount)))
+  return [...rest.slice(0, idx), ...inserted, ...rest.slice(idx)]
+}

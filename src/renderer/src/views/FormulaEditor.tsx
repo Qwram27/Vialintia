@@ -3,9 +3,9 @@ import { createPortal } from 'react-dom'
 import type { AmountUnit, Formula, FormulaRow, FormulaStatus, Material, ProductType, Settings, TestNote, TestPhase, TestStage } from '@shared/types'
 import { NOTE_LABELS, NOTE_ORDER, PRODUCT_PRESETS } from '@shared/defaults'
 import { currentVersion, familyById, useAccordIndex, useMaterialMap, useStore, withRows } from '@/store/store'
-import { confirmDialog, navigate, toast, withProgress } from '@/store/ui'
+import { confirmDialog, navigate, openContextMenu, toast, withProgress } from '@/store/ui'
 import { isWeb } from '@/platform'
-import { computeFormula, fmt, fmtSmart, inkOn, roundToStep, rowIfraEntry, scaleRows, type FormulaCalc } from '@/lib/calc'
+import { computeFormula, fmt, fmtSmart, inkOn, reduceAccordRow, roundToStep, rowIfraEntry, scaleRows, type FormulaCalc } from '@/lib/calc'
 import { formulaToCsv, formulaToPdfHtml } from '@/lib/exports'
 import { uid } from '@/lib/id'
 import { NumberInput } from '@/components/NumberInput'
@@ -495,6 +495,40 @@ function Versions({ formula, update }: { formula: Formula; update: (fn: (f: Form
 }
 
 // ---------------------------------------------------------------- composition table
+/** Row actions shared by the desktop table (right-click menu) and the phone row sheet. */
+function useRowActions(formula: Formula, rows: FormulaRow[], setRows: (rows: FormulaRow[]) => void, settings: Settings) {
+  const formulas = useStore((s) => s.formulas)
+  const materials = useMaterialMap()
+  const accordOf = (r: FormulaRow) => {
+    const fid = materials.get(r.materialId)?.accordFormulaId
+    return fid ? formulas.find((f) => f.id === fid) ?? null : null
+  }
+  const reduce = async (r: FormulaRow) => {
+    const accord = accordOf(r)
+    const m = materials.get(r.materialId)
+    if (!accord || !m) return
+    const next = reduceAccordRow(rows, r.id, formula.unit, accord, settings, uid)
+    if (!next) return toast(`${m.name} has no materials to reduce to`)
+    const added = next.length - rows.length + 1
+    setRows(next)
+    toast(`${m.name} reduced to its materials${added > 0 ? ` · ${added} row${added > 1 ? 's' : ''}` : ''}`)
+  }
+  const move = (rid: string, dir: -1 | 1) => {
+    const i = rows.findIndex((r) => r.id === rid)
+    const j = i + dir
+    if (i < 0 || j < 0 || j >= rows.length) return
+    const next = [...rows]
+    ;[next[i], next[j]] = [next[j], next[i]]
+    setRows(next)
+  }
+  const duplicate = (r: FormulaRow) => {
+    const i = rows.findIndex((x) => x.id === r.id)
+    setRows([...rows.slice(0, i + 1), { ...r, id: uid() }, ...rows.slice(i + 1)])
+  }
+  const remove = (rid: string) => setRows(rows.filter((x) => x.id !== rid))
+  return { accordOf, reduce, move, duplicate, remove }
+}
+
 function Composition({
   formula, rows, calc, setRows, update, settings
 }: {
@@ -513,6 +547,19 @@ function Composition({
   const [armed, setArmed] = useState<string | null>(null)
   const amountRefs = useRef(new Map<string, HTMLInputElement>())
   const showBatch = calc.batch.concentrateG > 0
+  const act = useRowActions(formula, rows, setRows, settings)
+
+  const rowMenu = (e: React.MouseEvent, row: FormulaRow, idx: number) => {
+    const accord = act.accordOf(row)
+    openContextMenu(e, [
+      accord && { label: 'Reduce accord', onSelect: () => act.reduce(row) },
+      accord && { label: 'Open accord formula', onSelect: () => navigate(`/formula/${accord.id}`) },
+      { label: 'Duplicate row', onSelect: () => act.duplicate(row), sep: !!accord },
+      { label: 'Move up', disabled: idx === 0, onSelect: () => act.move(row.id, -1) },
+      { label: 'Move down', disabled: idx === rows.length - 1, onSelect: () => act.move(row.id, 1) },
+      { label: 'Remove', danger: true, sep: true, onSelect: () => act.remove(row.id) }
+    ])
+  }
 
   useEffect(() => {
     if (focusRow) {
@@ -593,6 +640,7 @@ function Composition({
                   key={r.row.id}
                   draggable={armed === r.row.id}
                   className={`${dragId === r.row.id ? 'dragging' : ''}${overId === r.row.id && dragId !== r.row.id ? ' drop-above' : ''}`}
+                  onContextMenu={(e) => rowMenu(e, r.row, idx)}
                   onDragStart={(e) => {
                     setDragId(r.row.id)
                     e.dataTransfer.effectAllowed = 'move'
@@ -777,14 +825,8 @@ function MobileComposition({
     setRows([...rows].sort((a, b) => rank(a) - rank(b) || (grams.get(b.id) ?? 0) - (grams.get(a.id) ?? 0)))
   }
 
-  const move = (rid: string, dir: -1 | 1) => {
-    const i = rows.findIndex((r) => r.id === rid)
-    const j = i + dir
-    if (i < 0 || j < 0 || j >= rows.length) return
-    const next = [...rows]
-    ;[next[i], next[j]] = [next[j], next[i]]
-    setRows(next)
-  }
+  const act = useRowActions(formula, rows, setRows, settings)
+  const move = act.move
 
   const editing = calc.rows.find((r) => r.row.id === editId)
   const editIdx = editing ? calc.rows.indexOf(editing) : -1
@@ -949,6 +991,18 @@ function MobileComposition({
             <button className="btn btn-icon" title="Move down" disabled={editIdx >= rows.length - 1} onClick={() => move(editing.row.id, 1)}>
               ↓
             </button>
+            {act.accordOf(editing.row) && (
+              <button
+                className="btn"
+                title="Replace the accord with its materials in real amounts"
+                onClick={() => {
+                  act.reduce(editing.row)
+                  setEditId(null)
+                }}
+              >
+                Reduce
+              </button>
+            )}
             <div className="spacer" />
             <button
               className="btn btn-danger"
