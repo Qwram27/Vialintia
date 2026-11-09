@@ -1,13 +1,13 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
-  <!-- Vialintia mark: a formula sheet with a V cut into its top edge -->
+  <!-- Vialintia mark: formula sheet with a V and two rule lines -->
   <rect x="16" y="16" width="480" height="480" rx="108" fill="#000"/>
   <rect x="16.5" y="16.5" width="479" height="479" rx="107.5" fill="none" stroke="#2a2a2a" stroke-width="3"/>
   <g transform="translate(256 256) scale(.9) translate(-256 -256)">
-  <g fill="none" stroke="#ececec" stroke-width="16" stroke-linecap="square" stroke-linejoin="miter">
-    <path d="M152 84 H206 L256 228 L306 84 H360 V428 H152 Z"/>
-  </g>
-  <g fill="none" stroke="#5c5c5c" stroke-width="12" stroke-linecap="square">
-    <path d="M196 300 H316"/><path d="M196 338 H316"/><path d="M196 376 H268"/>
+  <g transform="translate(-6 0)" fill="none" stroke-linecap="square" stroke-linejoin="miter">
+    <path d="M144 88 H316 L380 152 V424 H144 Z" stroke="#ececec" stroke-width="12"/>
+    <path d="M316 88 V152 H380" stroke="#ececec" stroke-width="12"/>
+    <path d="M190 180 L236 300 L282 180" stroke="#ececec" stroke-width="22"/>
+    <path d="M190 352 H334 M190 386 H300" stroke="#6a6a6a" stroke-width="12"/>
   </g>
   </g>
 </svg>

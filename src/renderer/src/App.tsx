@@ -10,7 +10,7 @@ import { SettingsView } from '@/views/Settings'
 import { ConfirmHost, ToastHost } from '@/components/Overlays'
 import { useIsMobile } from '@/lib/useMobile'
 import { APP_VERSION } from '@shared/version'
-import { IconAnalyze, IconGear, IconPowder, IconSheet } from '@/components/Icons'
+import { IconAnalyze, IconGear, IconPowder, IconSheet, LogoMark } from '@/components/Icons'
 
 const NAV = [
   { key: 'dashboard', label: 'Formulas', path: '/', Icon: IconSheet },
@@ -56,7 +56,10 @@ export function App() {
       {!mobile && (
         <aside className="sidebar">
           <div className="brand drag">
-            <div className="brand-name">VIALINTIA</div>
+            <div className="brand-name">
+              <LogoMark size={20} />
+              VIALINTIA
+            </div>
             <div className="brand-sub">Formulation archive</div>
             <div className="brand-rule" />
           </div>
