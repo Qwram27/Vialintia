@@ -213,10 +213,21 @@ describe('starter library', () => {
     const out = upgradeSeedLibrary(v1, 1)
     expect(out.length).toBe(seeds.length)
     expect(out.find((m) => m.name === 'Galbanum oil')!.cas).toBe('8023-91-4')
-    expect(out.find((m) => m.name === 'Galbanum oil')!.tenacityHours).toBeNull()
+    expect(out.find((m) => m.name === 'Galbanum oil')!.tenacityHours).toBe(72) // v1 estimate cleared, then TGSC value filled (v4)
     expect(out.find((m) => m.name === 'Clary sage oil')!.cas).toBe('user-edited')
     expect(out.find((m) => m.name === 'Hedione')!.tenacityHours).toBe(999)
     expect(upgradeSeedLibrary(out, SEED_VERSION)).toBe(out)
+  })
+
+  it('fills IFRA and tenacity into starter materials (v4) without overriding user values', () => {
+    const lib: Material[] = seeds.map((m) => ({ ...m, tenacityHours: null, ifraLimit: null }))
+    lib.find((m) => m.name === 'Eugenol')!.ifraLimit = 1.0 // user value
+    const out = upgradeSeedLibrary(lib, 3)
+    expect(out.find((m) => m.name === 'Citral')!.ifraLimit).toBe(0.6)
+    expect(out.find((m) => m.name === 'Coumarin')!.ifraLimit).toBe(1.5)
+    expect(out.find((m) => m.name === 'Eugenol')!.ifraLimit).toBe(1.0)
+    expect(out.find((m) => m.name === 'Hedione')!.tenacityHours).toBe(72)
+    expect(out.find((m) => m.name === 'Calone')!.tenacityHours).toBeNull()
   })
 
   it('moves starter materials from DPG to ethanol (v3) but leaves user materials alone', () => {

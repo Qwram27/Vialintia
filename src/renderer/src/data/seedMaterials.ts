@@ -1,15 +1,16 @@
 import type { Material, MaterialType, NoteLevel } from '@shared/types'
 import { uid } from '@/lib/id'
+import { SEED_REF } from './seedReference'
 
 // Starter library. CAS numbers were cross-checked against supplier / database listings
 // (Nov 2026). Natural materials often carry more than one CAS (EU vs TSCA, oil vs absolute) —
-// always confirm against your supplier's documents. Tenacity, IFRA limits and prices are left
-// blank on purpose: fill them in from TGSC / the IFRA Standards / your supplier.
+// always confirm against your supplier's documents. Tenacity and IFRA Category 4 limits come
+// from seedReference.ts (TGSC substantivity / official IFRA Standards); prices stay blank.
 // Default dilution is only a practical stock-solution suggestion.
 type Seed = [name: string, cas: string, family: string, note: NoteLevel, dilution: number, type: MaterialType, description: string]
 
 /** Bump when seeds are added so existing libraries receive the new materials once. */
-export const SEED_VERSION = 3
+export const SEED_VERSION = 4
 /** Number of seeds shipped in v1 (the rest were added in v2). */
 const V1_COUNT = 78
 
@@ -170,20 +171,32 @@ const SEEDS: Seed[] = [
   ['Ambrocenide', '211299-54-6', 'amber', 'base', 1, 'synthetic', 'Symrise: extremely powerful, long-lasting woody amber. Crystalline'],
 ]
 
+/** Seed description plus where its tenacity / IFRA figures come from. */
+function describe(name: string, base: string): string {
+  const r = SEED_REF[name]
+  if (!r) return base
+  const bits: string[] = []
+  if (r.t != null && r.tAt != null) bits.push(`Blotter life measured at ${r.tAt}%`)
+  if (r.ifraNote) bits.push(r.ifraNote)
+  else if (r.ifraStd) bits.push(`IFRA Std ${r.ifraStd} (Amendment ${r.ifraAmendment})`)
+  return bits.length ? `${base}. ${bits.join('. ')}` : base
+}
+
 function toMaterial([name, cas, family, note, defaultDilution, type, description]: Seed, now: string): Material {
+  const ref = SEED_REF[name]
   return {
     id: uid(),
     name,
     cas: cas || undefined,
     family,
     note,
-    tenacityHours: null,
+    tenacityHours: ref?.t ?? null,
     defaultDilution,
     solvent: defaultDilution < 100 ? 'EtOH' : undefined,
     pricePerKg: null,
     supplier: '',
-    ifraLimit: null,
-    description,
+    ifraLimit: ref?.ifra ?? null,
+    description: describe(name, description),
     type,
     createdAt: now,
     updatedAt: now
@@ -218,8 +231,24 @@ export function upgradeSeedLibrary(materials: Material[], fromVersion: number): 
   // v3: default dilution solvent is ethanol (was DPG) — only for starter materials still on DPG.
   const seedNames = new Set(SEEDS.map((x) => x[0]))
   const solventFixed = fromVersion < 3 ? fixed.map((m) => (seedNames.has(m.name) && m.solvent === 'DPG' ? { ...m, solvent: 'EtOH', updatedAt: now } : m)) : fixed
-  if (fromVersion >= 2) return solventFixed
-  const have = new Set(solventFixed.map((m) => m.name.trim().toLowerCase()))
+  // v4: fill verified tenacity / IFRA Cat. 4 limits into starter materials — only empty fields,
+  // and the description only while it is still the untouched starter text.
+  const seedBy = new Map(SEEDS.map((x) => [x[0], x]))
+  const refFixed = fromVersion < 4
+    ? solventFixed.map((m) => {
+        const seed = seedBy.get(m.name)
+        const ref = SEED_REF[m.name]
+        if (!seed || !ref) return m
+        const next = { ...m }
+        if (next.tenacityHours == null && ref.t != null) next.tenacityHours = ref.t
+        if (next.ifraLimit == null && ref.ifra != null) next.ifraLimit = ref.ifra
+        if ((next.description ?? '') === seed[6]) next.description = describe(m.name, seed[6])
+        const changed = next.tenacityHours !== m.tenacityHours || next.ifraLimit !== m.ifraLimit || next.description !== m.description
+        return changed ? { ...next, updatedAt: now } : m
+      })
+    : solventFixed
+  if (fromVersion >= 2) return refFixed
+  const have = new Set(refFixed.map((m) => m.name.trim().toLowerCase()))
   const added = SEEDS.slice(V1_COUNT).filter((s) => !have.has(s[0].toLowerCase())).map((s) => toMaterial(s, now))
-  return [...solventFixed, ...added]
+  return [...refFixed, ...added]
 }

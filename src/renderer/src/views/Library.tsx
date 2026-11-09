@@ -82,7 +82,7 @@ export function Library() {
         <div>
           <div className="page-kicker">Index · Raw materials</div>
           <h1 className="page-title">Materials</h1>
-          <div className="page-sub">{String(materials.length).padStart(3, '0')} entries · IFRA limits and prices are yours to fill in</div>
+          <div className="page-sub">{String(materials.length).padStart(3, '0')} entries · IFRA from the IFRA Standards · tenacity from TGSC · prices are yours</div>
         </div>
         <div className="btn-group">
           <button
@@ -387,7 +387,7 @@ function MaterialDrawer({ material, usage, onClose }: { material: Material; usag
         <div className="field">
           <label>IFRA limit · Cat. 4 (fine fragrance)</label>
           <div className="suffix">
-            <NumberInput value={material.ifraLimit} min={0} allowEmpty onCommit={(v) => set({ ifraLimit: v })} placeholder="No restriction entered" />
+            <NumberInput value={material.ifraLimit} min={0} allowEmpty onCommit={(v) => set({ ifraLimit: v })} placeholder="No own IFRA Standard" />
             <span>%</span>
           </div>
           <span className="hint">Max % in the finished product. Check your supplier’s IFRA certificate / the current IFRA Amendment.</span>
