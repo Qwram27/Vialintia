@@ -22,4 +22,5 @@ nsis:
   shortcutName: Vialintia
   createDesktopShortcut: true
 portable:
+  unpackDirName: Vialintia-${version}
   artifactName: Vialintia-${version}-portable.exe
