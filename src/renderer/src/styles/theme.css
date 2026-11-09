@@ -840,3 +840,25 @@ svg text { font-family: var(--mono); }
 }
 /* focus = brighter hairline, no halo */
 .input:focus, .select:focus, .textarea:focus, .cell-input:focus { box-shadow: none; }
+
+/* ─────────────────────────────────────────────────────────────
+   1.4.5 — iPhone: full-height app, sharp top bar, tab icons
+   ───────────────────────────────────────────────────────────── */
+@media (max-width: 700px) {
+  /* --app-h = real screen height in Home Screen mode (see main.tsx) */
+  html, body, #root, .app { height: var(--app-h, 100%); }
+  .app { position: relative; overflow: hidden; }
+  .main { height: 100%; }
+  .tabbar { position: absolute; }
+  .toasts { position: absolute; }
+  .overlay { bottom: auto; height: var(--app-h, 100%); }
+
+  /* solid top bar: backdrop blur made the bar text render soft on iOS */
+  .topbar { background: #000; backdrop-filter: none; -webkit-backdrop-filter: none; border-bottom: 1px solid var(--line-soft); }
+
+  /* tab bar: icon over "01 LABEL" */
+  .tab-item { gap: 5px; }
+  .tab-item .lbl { font-size: 8.5px; letter-spacing: .14em; white-space: nowrap; }
+  .tab-item .lbl .idx { font-size: 8.5px; font-weight: 400; letter-spacing: 0; color: var(--faint); line-height: inherit; }
+  .tab-item.active .lbl .idx { color: var(--muted); }
+}

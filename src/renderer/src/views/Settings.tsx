@@ -158,7 +158,7 @@ export function SettingsView() {
                     value={Math.round(settings.nearLimitRatio * 100)}
                     min={1}
                     max={100}
-                    onCommit={(v) => updateSettings({ nearLimitRatio: (v ?? 80) / 100 })}
+                    onCommit={(v) => updateSettings({ nearLimitRatio: (v ?? 90) / 100 })}
                   />
                   <span>%</span>
                 </div>

@@ -9,12 +9,13 @@ import { Compare } from '@/views/Compare'
 import { SettingsView } from '@/views/Settings'
 import { ConfirmHost, ToastHost } from '@/components/Overlays'
 import { useIsMobile } from '@/lib/useMobile'
+import { IconCompare, IconFlask, IconSettings, IconVial } from '@/components/Icons'
 
 const NAV = [
-  { key: 'dashboard', label: 'Formulas', path: '/' },
-  { key: 'library', label: 'Materials', path: '/library' },
-  { key: 'compare', label: 'Compare', path: '/compare' },
-  { key: 'settings', label: 'Settings', path: '/settings' }
+  { key: 'dashboard', label: 'Formulas', path: '/', Icon: IconFlask },
+  { key: 'library', label: 'Materials', path: '/library', Icon: IconVial },
+  { key: 'compare', label: 'Compare', path: '/compare', Icon: IconCompare },
+  { key: 'settings', label: 'Settings', path: '/settings', Icon: IconSettings }
 ] as const
 
 export function App() {
@@ -89,7 +90,7 @@ export function App() {
           )}
           <div className="sidebar-foot">
             <span>Offline</span>
-            <span>v1.4.4</span>
+            <span>v1.4.5</span>
           </div>
         </aside>
       )}
@@ -110,8 +111,10 @@ export function App() {
               aria-current={active === n.key ? 'page' : undefined}
               onClick={() => navigate(n.path)}
             >
-              <span className="idx">{String(i + 1).padStart(2, '0')}</span>
-              <span className="lbl">{n.label}</span>
+              <n.Icon size={20} />
+              <span className="lbl">
+                <span className="idx">{String(i + 1).padStart(2, '0')}</span> {n.label}
+              </span>
             </button>
           ))}
         </nav>
