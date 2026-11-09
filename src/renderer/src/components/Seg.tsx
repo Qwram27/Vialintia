@@ -29,11 +29,17 @@ export function Seg<T extends string>({
     if (!el) return
     const measure = () => {
       const on = el.querySelector<HTMLButtonElement>('button.on')
-      setThumb(on ? { x: on.offsetLeft, w: on.offsetWidth } : null)
+      if (!on) return setThumb(null)
+      // Sub-pixel accurate position relative to the track.
+      const a = el.getBoundingClientRect()
+      const b = on.getBoundingClientRect()
+      setThumb({ x: b.left - a.left - el.clientLeft, w: b.width })
     }
     measure()
     const ro = new ResizeObserver(measure)
     ro.observe(el)
+    el.querySelectorAll('button').forEach((b) => ro.observe(b))
+    document.fonts?.ready.then(measure)
     return () => ro.disconnect()
   }, [value, options.length])
 

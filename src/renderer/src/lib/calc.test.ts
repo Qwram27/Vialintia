@@ -172,3 +172,12 @@ describe('helpers', () => {
     expect(e.points[e.points.length - 1].top).toBe(0)
   })
 })
+
+describe('archive codes', async () => {
+  const { seasonCode } = await import('./archive')
+  it('names AW by the year it runs into', () => {
+    expect(seasonCode('2026-11-09T12:00:00')).toBe('AW27')
+    expect(seasonCode('2027-01-15T12:00:00')).toBe('AW27')
+    expect(seasonCode('2026-05-01T12:00:00')).toBe('SS26')
+  })
+})

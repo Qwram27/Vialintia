@@ -249,7 +249,7 @@ function Versions({ formula, update }: { formula: Formula; update: (fn: (f: Form
     const nums = formula.versions.map((v) => Number(/(\d+)\s*$/.exec(v.label)?.[1] ?? 0))
     const v = {
       id: uid(),
-      label: `Mod ${Math.max(formula.versions.length, ...nums) + 1}`,
+      label: `V${Math.max(formula.versions.length, ...nums) + 1}`,
       createdAt: new Date().toISOString(),
       rows: src.rows.map((r) => ({ ...r, id: uid() }))
     }

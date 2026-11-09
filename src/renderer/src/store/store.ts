@@ -68,14 +68,18 @@ export function normalizeSettings(s: Partial<Settings> | undefined): Settings {
 function normalizeFormula(f: Formula): Formula {
   const versions = f.versions?.length
     ? f.versions
-    : [{ id: uid(), label: 'Mod 1', createdAt: f.createdAt ?? now(), rows: [] }]
+    : [{ id: uid(), label: 'V1', createdAt: f.createdAt ?? now(), rows: [] }]
   return {
     ...f,
+    // Earlier versions were labelled "Mod 1", "Mod 2"… — now "V1", "V2"…
+    versions: versions.map((v) => {
+      const m = /^mod\s*(\d+)$/i.exec(v.label.trim())
+      return m ? { ...v, label: `V${m[1]}` } : v
+    }),
     tags: f.tags ?? [],
     notes: f.notes ?? [],
     description: f.description ?? '',
     batch: { ...{ mode: 'bottles' as const, bottles: 1, bottleMl: 50, massG: 10 }, ...(f.batch ?? {}) },
-    versions,
     currentVersionId: versions.some((v) => v.id === f.currentVersionId) ? f.currentVersionId : versions[versions.length - 1].id
   }
 }
@@ -92,7 +96,7 @@ export function withRows(f: Formula, rows: FormulaRow[]): Formula {
 }
 
 export function newFormula(name = 'Untitled formula'): Formula {
-  const v: FormulaVersion = { id: uid(), label: 'Mod 1', createdAt: now(), rows: [] }
+  const v: FormulaVersion = { id: uid(), label: 'V1', createdAt: now(), rows: [] }
   return {
     id: uid(),
     name,

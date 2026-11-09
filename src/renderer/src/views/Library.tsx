@@ -148,6 +148,17 @@ export function Library() {
         <div className="card" style={{ padding: '4px 10px 10px', minWidth: 0 }}>
           <div className="table-wrap">
             <table className="ftable ltable">
+              <colgroup>
+                <col style={{ width: '27%' }} />
+                <col style={{ width: '11%' }} />
+                <col style={{ width: '11%' }} />
+                <col style={{ width: '9%' }} />
+                <col style={{ width: '8%' }} />
+                <col style={{ width: '9%' }} />
+                <col style={{ width: '8%' }} />
+                <col style={{ width: '10%' }} />
+                <col style={{ width: '7%' }} />
+              </colgroup>
               <thead>
                 <tr>
                   {th('name', 'Material', 'l')}
