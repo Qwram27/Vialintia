@@ -60,6 +60,12 @@ function createWindow(): void {
 /** Dev helper: VIALINTIA_CAPTURE="outDir|#/route1|#/route2" saves screenshots and quits. */
 function runCapture(win: BrowserWindow, spec: string): void {
   const [outDir, ...routes] = spec.split('|')
+  // VIALINTIA_CAPTURE_SIZE="390x844" renders at phone width.
+  const size = process.env.VIALINTIA_CAPTURE_SIZE?.split('x').map(Number)
+  if (size?.length === 2) {
+    win.setMinimumSize(200, 200)
+    win.setContentSize(size[0], size[1])
+  }
   win.webContents.once('did-finish-load', async () => {
     const wait = (ms: number) => new Promise((r) => setTimeout(r, ms))
     await wait(1500)
