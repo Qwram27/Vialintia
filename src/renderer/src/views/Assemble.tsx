@@ -103,7 +103,7 @@ export function Assemble({ id }: { id: string }) {
               <span className="v">{fmt(calc.rows.reduce((s, x) => s + (x.material ? toDrops(x.batchGrams) : 0), 0), 0)} drops · ≈ {show(r(b.concentrateG))} g</span>
             </div>
           ) : (
-            <div className="stat-row"><span className="k">Total weight</span><span className="v">{show(r(b.concentrateG))} g</span></div>
+            <div className="stat-row"><span className="k">Concentrate</span><span className="v">{show(r(b.concentrateG))} g</span></div>
           )}
           <div className="stat-row"><span className="k">Then alcohol</span><span className="v">{show(r(b.alcoholG))} g · {fmt(b.alcoholMl, 1)} ml</span></div>
           <div className="stat-row"><span className="k">Ingredients</span><span className="v">{calc.rows.filter((x) => x.material && x.batchGrams > 0).length}</span></div>

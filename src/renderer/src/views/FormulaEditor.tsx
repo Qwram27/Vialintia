@@ -234,7 +234,7 @@ function ScaleDialog({
     update((f) => {
       const cur = currentVersion(f)
       const rows = scaleRows(cur.rows, f.unit, settings, target)
-      const batch = mode === 'bottles' ? { ...f.batch, mode: 'bottles' as const, bottles, bottleMl: ml } : { ...f.batch, mode: 'mass' as const, massG: target }
+      const batch = mode === 'bottles' ? { ...f.batch, mode: 'bottles' as const, bottles, bottleMl: ml } : { ...f.batch, mode: 'mass' as const, massG: f.concentration > 0 ? (target * 100) / f.concentration : target }
       if (!asNew) return { ...f, unit: 'g', batch, versions: f.versions.map((x) => (x.id === cur.id ? { ...x, rows } : x)) }
       const nums = f.versions.map((x) => Number(/(\d+)\s*$/.exec(x.label)?.[1] ?? 0))
       const nv = { id: uid(), label: `V${Math.max(f.versions.length, ...nums) + 1}`, createdAt: new Date().toISOString(), comment: `Scaled from ${cur.label} to ${fmtSmart(target)} g concentrate`, rows: rows.map((r) => ({ ...r, id: uid() })) }
@@ -1008,7 +1008,7 @@ function MobileComposition({
             {fmtSmart(rows.reduce((s, r) => s + (r.amount || 0), 0))} {unit}
             {formula.unit !== 'g' ? ` · ${fmtSmart(calc.totalGrams)} g` : ''}
           </span>
-          <span className="faint">{fmtPct(calc.totalGrams > 0 ? (formula.concentration * calc.neatGrams) / calc.totalGrams : formula.concentration)} neat in product</span>
+          <span className="faint">{fmtPct(formula.concentration)} in product</span>
         </div>
       )}
 
@@ -1159,7 +1159,6 @@ function Inspector({
   const cur = settings.currency
   const setBatch = (patch: Partial<Formula['batch']>) => update((f) => ({ ...f, batch: { ...f.batch, ...patch } }))
 
-  const finalPct = calc.totalGrams > 0 ? (formula.concentration * calc.neatGrams) / calc.totalGrams : formula.concentration
   const setupPanel = (
     <>
       <section className="insp-sec">
@@ -1201,10 +1200,6 @@ function Inspector({
               <span>%</span>
             </div>
           </div>
-        </div>
-        <div className="stat-row" title="Neat aroma in the finished product: concentration × neat share of the concentrate (solvent in dilutions removed)">
-          <span className="k">Final dilution</span>
-          <span className="v">{fmtPct(finalPct)} neat aroma</span>
         </div>
       </section>
       <section className="insp-sec">

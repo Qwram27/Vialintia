@@ -123,7 +123,7 @@ export function formulaToPdfHtml(formula: Formula, versionLabel: string, calc: F
         ? `${formula.batch.bottles} × ${fmtSmart(formula.batch.bottleMl)} ml (${fmt(b.productMl, 1)} ml)`
         : `${fmt(b.concentrateG, 2)} g concentrate`
     ],
-    ['Total weight', `${fmt(b.concentrateG, 2)} g`],
+    ['Concentrate', `${fmt(b.concentrateG, 2)} g`],
     ['Alcohol', `${fmt(b.alcoholG, 2)} g  /  ${fmt(b.alcoholMl, 1)} ml`],
     ['Created / updated', `${date(formula.createdAt)} / ${date(formula.updatedAt)}`]
   ]
