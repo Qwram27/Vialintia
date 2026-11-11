@@ -62,7 +62,7 @@ export function Compare({ a, b }: { a?: string; b?: string }) {
     return (
       <div className="page">
         <div className="card empty">
-          <div className="mark">A/B</div>
+          <div className="mark">X/Y</div>
           <h3>Nothing to compare yet</h3>
           <p>Create a formula and save a new version to see the differences side by side.</p>
         </div>
@@ -109,8 +109,8 @@ export function Compare({ a, b }: { a?: string; b?: string }) {
 
       <div className="cmp-head">
         {[
-          { label: 'A', key: keyA, set: (k: string) => go(k, keyB), calc: calcA, sel: selA },
-          { label: 'B', key: keyB, set: (k: string) => go(keyA, k), calc: calcB, sel: selB }
+          { label: 'X', key: keyA, set: (k: string) => go(k, keyB), calc: calcA, sel: selA },
+          { label: 'Y', key: keyB, set: (k: string) => go(keyA, k), calc: calcB, sel: selB }
         ].map((side) => {
           return (
             <div key={side.label} className="card card-pad">
@@ -158,8 +158,8 @@ export function Compare({ a, b }: { a?: string; b?: string }) {
             </span>
             <span className="cmp-bars">
               {[
-                { k: 'A', v: sa(n) },
-                { k: 'B', v: sb(n) }
+                { k: 'X', v: sa(n) },
+                { k: 'Y', v: sb(n) }
               ].map((x) => (
                 <span key={x.k} className="cmp-bar">
                   <span className="k">{x.k}</span>
@@ -193,8 +193,8 @@ export function Compare({ a, b }: { a?: string; b?: string }) {
             <tr>
               <th className="l">Material</th>
               <th title="Tenacity on a blotter (TGSC substantivity) — fastest first within each group">Life h</th>
-              <th>A %</th>
-              <th>B %</th>
+              <th>X %</th>
+              <th>Y %</th>
               <th>Δ</th>
               <th className="l" style={{ width: 110 }}>
                 Change

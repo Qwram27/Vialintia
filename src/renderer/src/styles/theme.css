@@ -1047,3 +1047,39 @@ svg text { font-family: var(--mono); }
 
 /* Analyze: no zebra — added / removed rows are marked by the Change column and strike-through only */
 .cmp-table .diff-added td, .cmp-table .diff-removed td { background: transparent; }
+
+/* ───────── less clutter ───────── */
+.toolbar-pair { display: flex; gap: 10px; align-items: center; }
+.page-foot { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line-soft); }
+
+/* ───────── phone tab bar, X-style: icons only, the active tab expands to show its label ───────── */
+@media (max-width: 700px) {
+  .tabbar { padding-top: 4px; }
+  .tab-item {
+    flex: 1 1 0; min-width: 0; flex-direction: row; gap: 0; position: relative;
+    background: transparent !important; box-shadow: none !important; color: var(--muted);
+    transition: flex-grow .35s var(--ease), color .25s var(--ease);
+  }
+  .tab-item .lbl {
+    max-width: 0; opacity: 0; overflow: hidden; white-space: nowrap;
+    font-size: 11px; letter-spacing: .14em;
+    transition: max-width .35s var(--ease), opacity .25s var(--ease), margin-left .35s var(--ease);
+  }
+  .tab-item.active { flex-grow: 2.4; color: var(--text); }
+  .tab-item.active .lbl { max-width: 160px; opacity: 1; margin-left: 9px; }
+  .tab-item::after {
+    content: ''; position: absolute; left: 50%; bottom: 2px; height: 3px; width: 0; border-radius: 2px;
+    background: #fff; transform: translateX(-50%); transition: width .35s var(--ease);
+  }
+  .tab-item.active::after { width: calc(100% - 24px); }
+
+  .toolbar-pair { flex: 1 1 100%; }
+  .toolbar-pair .seg { flex: 1; display: flex; }
+  .toolbar-pair .seg button { flex: 1; padding-left: 6px; padding-right: 6px; }
+  .page-foot { display: grid; grid-template-columns: 1fr 1fr; }
+  .page-foot .btn { width: 100%; justify-content: center; }
+}
+@media (max-width: 700px) {
+  .tabbar { background: #000; box-shadow: inset 0 1px 0 rgba(255,255,255,.08); backdrop-filter: none; -webkit-backdrop-filter: none; }
+  .toolbar > .faint.small { flex: 1 1 100%; text-align: right; }
+}
