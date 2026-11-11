@@ -101,9 +101,9 @@ describe('computeFormula', () => {
     expect(c.batch.costPerBottle).toBeCloseTo((16.4 * 100) / 1000 / 2)
   })
 
-  it('scales to a concentrate mass', () => {
+  it('scales to a total product weight', () => {
     const c = computeFormula(
-      formula({ batch: { mode: 'mass', bottles: 0, bottleMl: 0, massG: 100 } }),
+      formula({ batch: { mode: 'mass', bottles: 0, bottleMl: 0, massG: 500 } }),
       [
         { id: '1', materialId: 'a', amount: 3, dilution: 100 },
         { id: '2', materialId: 'b', amount: 1, dilution: 100 }

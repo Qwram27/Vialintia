@@ -243,8 +243,9 @@ export function computeBatch(formula: Formula, totalGrams: number, costPerKg: nu
   let productG: number
   let concentrateG: number
   if (b.mode === 'mass') {
-    concentrateG = Math.max(0, b.massG || 0)
-    productG = conc > 0 ? concentrateG / (conc / 100) : 0
+    // massG = total weight of the finished product (concentrate + alcohol)
+    productG = Math.max(0, b.massG || 0)
+    concentrateG = (productG * conc) / 100
     productMl = settings.productDensity > 0 ? productG / settings.productDensity : 0
   } else {
     productMl = Math.max(0, (b.bottles || 0) * (b.bottleMl || 0))
@@ -577,6 +578,9 @@ export function stepRow(rows: FormulaRow[], rowId: string, dir: -1 | 1): Formula
 /** Percentage with one decimal and the % sign (tiny non-zero values keep their precision). */
 export function fmtPct(n: number | null | undefined): string {
   if (n == null || !Number.isFinite(n)) return '—'
-  if (n !== 0 && Math.abs(n) < 0.05) return `${fmtSmart(n)}%`
-  return `${fmt(n, 1)}%`
+  const v = Math.abs(n)
+  if (v === 0 || v >= 1) return `${fmt(n, 1)}%`
+  if (v >= 0.1) return `${fmt(n, 2)}%`
+  if (v >= 0.01) return `${fmt(Math.round(n * 100) / 100, 3)}%`
+  return `${fmt(n, 3)}%`
 }
