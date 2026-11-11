@@ -176,23 +176,25 @@ export function Dashboard() {
               }))}
             />
             <div className="spacer" />
-            <Seg
-              value={view}
-              onChange={setView}
-              options={[
-                { value: 'grid', label: 'Grid' },
-                { value: 'index', label: 'Index' }
-              ]}
-            />
-            <Seg
-              value={sort}
-              onChange={setSort}
-              options={[
-                { value: 'updated', label: 'Recent' },
-                { value: 'number', label: 'N°' },
-                { value: 'name', label: 'A–Z' }
-              ]}
-            />
+            <div className="toolbar-pair">
+              <Seg
+                value={view}
+                onChange={setView}
+                options={[
+                  { value: 'grid', label: 'Grid' },
+                  { value: 'index', label: 'Index' }
+                ]}
+              />
+              <Seg
+                value={sort}
+                onChange={setSort}
+                options={[
+                  { value: 'updated', label: 'Recent' },
+                  { value: 'number', label: 'N°' },
+                  { value: 'name', label: 'A–Z' }
+                ]}
+              />
+            </div>
           </div>
 
           {view === 'index' ? (

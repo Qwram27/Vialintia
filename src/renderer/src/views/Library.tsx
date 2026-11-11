@@ -99,6 +99,7 @@ export function Library() {
       })
   }, [materials, settings.families, q, family, note, type, sort])
 
+  const showFilters = q.trim().length > 0 || family !== 'all' || note !== 'all' || type !== 'all'
   const sel = materials.find((m) => m.id === selected)
 
   const th = (key: SortKey, label: string, cls = '') => (
@@ -117,27 +118,6 @@ export function Library() {
         </div>
         <div className="btn-group">
           <button
-            className="btn"
-            onClick={async () => {
-              const text = await window.vialintia.importText('csv')
-              if (!text) return
-              const items = csvToMaterials(text, settings)
-              const n = importMaterials(items)
-              toast(n ? `Imported ${n} materials` : 'No materials found — the CSV needs a “name” column')
-            }}
-          >
-            <IconUpload /> Import CSV
-          </button>
-          <button
-            className="btn"
-            onClick={async () => {
-              const p = await window.vialintia.exportText(materialsToCsv(materials, settings), 'vialintia-materials.csv', 'csv')
-              if (p) toast('Library exported')
-            }}
-          >
-            <IconDownload /> Export CSV
-          </button>
-          <button
             className="btn btn-primary"
             onClick={() => {
               const m = addMaterial({ family: family !== 'all' ? family : 'other', note: note !== 'all' ? note : 'heart' })
@@ -154,28 +134,33 @@ export function Library() {
           <IconSearch />
           <input className="input" placeholder="Search name, CAS, odour, supplier…" value={q} onChange={(e) => setQ(e.target.value)} />
         </div>
-        <select className="select" style={{ width: 160 }} value={family} onChange={(e) => setFamily(e.target.value)}>
-          <option value="all">All families</option>
-          {settings.families.map((f) => (
-            <option key={f.id} value={f.id}>
-              {f.name}
-            </option>
-          ))}
-        </select>
-        <Seg
-          value={note}
-          onChange={setNote}
-          options={[{ value: 'all' as const, label: 'All' }, ...NOTE_ORDER.map((n) => ({ value: n, label: NOTE_LABELS[n] }))]}
-        />
-        <select className="select" style={{ width: 150 }} value={type} onChange={(e) => setType(e.target.value as MaterialType | 'all')}>
-          <option value="all">All types</option>
-          {Object.entries(TYPES).map(([k, v]) => (
-            <option key={k} value={k}>
-              {v}
-            </option>
-          ))}
-        </select>
-        <span className="faint small">{list.length} shown</span>
+        {/* filters only once a search has started (or a filter is set) — keeps the page calm */}
+        {showFilters && (
+          <>
+            <select className="select" style={{ width: 160 }} value={family} onChange={(e) => setFamily(e.target.value)}>
+              <option value="all">All families</option>
+              {settings.families.map((f) => (
+                <option key={f.id} value={f.id}>
+                  {f.name}
+                </option>
+              ))}
+            </select>
+            <select className="select" style={{ width: 150 }} value={type} onChange={(e) => setType(e.target.value as MaterialType | 'all')}>
+              <option value="all">All types</option>
+              {Object.entries(TYPES).map(([k, v]) => (
+                <option key={k} value={k}>
+                  {v}
+                </option>
+              ))}
+            </select>
+            <Seg
+              value={note}
+              onChange={setNote}
+              options={[{ value: 'all' as const, label: 'All' }, ...NOTE_ORDER.map((n) => ({ value: n, label: NOTE_LABELS[n] }))]}
+            />
+          </>
+        )}
+        {showFilters && <span className="faint small">{list.length} shown</span>}
       </div>
 
       <div className={`lib${sel && !mobile ? ' with-drawer' : ''}`}>
@@ -286,6 +271,29 @@ export function Library() {
           ) : (
             <MaterialDrawer key={sel.id} material={sel} usage={usage.get(sel.id) ?? 0} onClose={() => setSelected(null)} />
           ))}
+      </div>
+      <div className="page-foot">
+        <button
+          className="btn"
+          onClick={async () => {
+            const text = await window.vialintia.importText('csv')
+            if (!text) return
+            const items = csvToMaterials(text, settings)
+            const n = importMaterials(items)
+            toast(n ? `Imported ${n} materials` : 'No materials found — the CSV needs a “name” column')
+          }}
+        >
+          <IconUpload /> Import CSV
+        </button>
+        <button
+          className="btn"
+          onClick={async () => {
+            const p = await window.vialintia.exportText(materialsToCsv(materials, settings), 'vialintia-materials.csv', 'csv')
+            if (p) toast('Library exported')
+          }}
+        >
+          <IconDownload /> Export CSV
+        </button>
       </div>
     </div>
   )
