@@ -706,7 +706,7 @@ function Composition({
               <th>Amount ({UNIT_LABEL[formula.unit]})</th>
               <th>Dilution</th>
               <th title="Share of the concentrate as weighed">Weighed %</th>
-              <th title="Neat material in the finished product">In product %</th>
+              <th title="Neat (undiluted) material as % of the concentrate">Active %</th>
               <th>IFRA</th>
               {showBatch && <th title="Weighed grams for the batch set in the sidebar">Batch g</th>}
               <th style={{ width: 30 }} />
@@ -824,7 +824,7 @@ function Composition({
                     </div>
                   </td>
                   <td title={`Neat in concentrate: ${fmtSmart(r.neatPct)}%${r.cost ? ` · cost ${settings.currency}${fmt(r.cost, 2)}` : ''}`}>{fmt(r.weighedPct, 2)}</td>
-                  <td>{fmtSmart(r.productPct)}</td>
+                  <td>{fmtSmart(r.neatPct)}</td>
                   <td>
                     <IfraBadge entry={rowIfraEntry(calc.ifra, m, accords)} />
                   </td>
@@ -850,7 +850,7 @@ function Composition({
                   {formula.unit !== 'g' ? `${fmtSmart(calc.totalGrams)} g` : ''}
                 </td>
                 <td>100.00</td>
-                <td>{fmt(formula.concentration, 2)}</td>
+                <td>{fmt(calc.rows.reduce((s, r) => s + (r.neatPct || 0), 0), 2)}</td>
                 <td />
                 {showBatch && <td>{fmt(calc.batch.concentrateG, 2)}</td>}
                 <td />
@@ -981,7 +981,7 @@ function MobileComposition({
                   )}
                   <span>{r.row.dilution < 100 ? `${fmtSmart(r.row.dilution)}%${r.row.solvent ? ` ${r.row.solvent}` : ''}` : 'neat'}</span>
                   <span>·</span>
-                  <span>{fmtSmart(r.productPct)}% prod.</span>
+                  <span>{fmtSmart(r.neatPct)}% active</span>
                   {showBatch && (
                     <>
                       <span>·</span>
@@ -1081,8 +1081,8 @@ function MobileComposition({
               <span className="v">{fmt(editing.weighedPct, 2)}%</span>
             </div>
             <div>
-              <span className="k">In product</span>
-              <span className="v">{fmtSmart(editing.productPct)}%</span>
+              <span className="k">Active</span>
+              <span className="v">{fmtSmart(editing.neatPct)}%</span>
             </div>
             <div>
               <span className="k">Batch</span>
@@ -1230,7 +1230,7 @@ function Inspector({
           </div>
         ) : (
           <div className="field">
-            <label>Concentrate to weigh</label>
+            <label>Total weight</label>
             <div className="suffix">
               <NumberInput value={formula.batch.massG} min={0} onCommit={(v) => setBatch({ massG: v ?? 0 })} />
               <span>g</span>

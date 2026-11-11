@@ -55,7 +55,7 @@ export function csvToMaterials(text: string, settings: Settings): Partial<Materi
 export function formulaToCsv(formula: Formula, calc: FormulaCalc, settings: Settings): string {
   const unit = formula.unit === 'drops' ? 'drops' : 'g'
   return toCsv([
-    ['Material', 'CAS', 'Family', 'Note', `Amount (${unit})`, 'Dilution %', 'Solvent', 'Weighed %', 'Neat % in concentrate', '% in product', 'IFRA limit %', `Batch (g)`],
+    ['Material', 'CAS', 'Family', 'Note', `Amount (${unit})`, 'Dilution %', 'Solvent', 'Weighed %', 'Active %', 'IFRA limit %', `Batch (g)`],
     ...calc.rows.map((r) => [
       r.material?.name ?? 'Missing material',
       r.material?.cas ?? '',
@@ -66,7 +66,6 @@ export function formulaToCsv(formula: Formula, calc: FormulaCalc, settings: Sett
       r.row.dilution < 100 ? r.row.solvent ?? '' : '',
       r.weighedPct.toFixed(4),
       r.neatPct.toFixed(4),
-      r.productPct.toFixed(4),
       r.material?.ifraLimit ?? '',
       r.batchGrams.toFixed(4)
     ]),
@@ -105,7 +104,7 @@ export function formulaToPdfHtml(formula: Formula, versionLabel: string, calc: F
         <td class="c">${r.row.dilution < 100 ? `${fmtTrim(r.row.dilution)}% ${esc(r.row.solvent ?? '')}` : '100%'}</td>
         <td>${fmtSmart(r.row.amount)}</td>
         <td>${fmt(r.weighedPct, 3)}</td>
-        <td>${fmt(r.productPct, 4)}</td>
+        <td>${fmt(r.neatPct, 3)}</td>
         <td>${ifra ? `${fmtSmart(ifra.limit)}${flag ? ' !' : ''}` : '–'}</td>
         <td>${fmt(r.batchGrams, 3)}</td>
         <td class="chk"></td>
@@ -124,7 +123,7 @@ export function formulaToPdfHtml(formula: Formula, versionLabel: string, calc: F
         ? `${formula.batch.bottles} × ${fmtSmart(formula.batch.bottleMl)} ml (${fmt(b.productMl, 1)} ml)`
         : `${fmt(b.concentrateG, 2)} g concentrate`
     ],
-    ['Concentrate to weigh', `${fmt(b.concentrateG, 2)} g`],
+    ['Total weight', `${fmt(b.concentrateG, 2)} g`],
     ['Alcohol', `${fmt(b.alcoholG, 2)} g  /  ${fmt(b.alcoholMl, 1)} ml`],
     ['Created / updated', `${date(formula.createdAt)} / ${date(formula.updatedAt)}`]
   ]
@@ -204,12 +203,12 @@ export function formulaToPdfHtml(formula: Formula, versionLabel: string, calc: F
   <table class="comp">
     <thead><tr>
       <th class="c">No.</th><th class="l">Material</th><th class="l">CAS</th><th class="c">Note</th><th class="c">Dilution</th>
-      <th>Amount (${unit})</th><th>% weighed</th><th>% in product</th><th>IFRA max %</th><th>Batch (g)</th><th class="c">✓</th>
+      <th>Amount (${unit})</th><th>% weighed</th><th>% active</th><th>IFRA max %</th><th>Batch (g)</th><th class="c">✓</th>
     </tr></thead>
     <tbody>${rows}</tbody>
     <tfoot><tr>
       <td></td><td class="l">Total</td><td></td><td></td><td></td>
-      <td>${fmtSmart(amountSum)}</td><td>100.000</td><td>${fmt(formula.concentration, 2)}</td><td></td><td>${fmt(b.concentrateG, 3)}</td><td></td>
+      <td>${fmtSmart(amountSum)}</td><td>100.000</td><td>${fmt(calc.rows.reduce((s, r) => s + r.neatPct, 0), 3)}</td><td></td><td>${fmt(b.concentrateG, 3)}</td><td></td>
     </tr></tfoot>
   </table>
 
