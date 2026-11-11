@@ -16,7 +16,7 @@ Offline fine-fragrance formulation app (Electron + React + TypeScript, electron-
 - **No glows** anywhere (no luminous halos / coloured box-shadow blurs, no focus halos). Owner rejected decorative "AI-looking" UI: no sliding glass thumbs, rotating chevrons, staggered list animations, pulsing dots. Keep it raw and flat.
 - No botanical/plant motifs (rejected as generic).
 - Note & olfactive-family colours stay user-adjustable (Settings → colours).
-- Navigation: icons, no 01–04 numbers (sidebar + tab bar). Nav icons in `Icons.tsx` (`IconSheet` formulas, `IconPowder` materials = tilted pipette, tip to the lower left, `IconAnalyze` plotted curve, `IconGear` plain six-tooth gear) use square caps / mitred joins. The Compare section is labelled **Analyze** (route stays `/compare`); its two sides are **X** and **Y**.
+- Navigation: icons, no 01–04 numbers (sidebar + tab bar). Nav icons in `Icons.tsx` (`IconSheet` formulas, `IconPowder` materials = disposable plastic pipette (one outline: bulb + thin stem), tilted, tip to the lower left, `IconAnalyze` plotted curve, `IconGear` plain six-tooth gear) use square caps / mitred joins. The Compare section is labelled **Analyze** (route stays `/compare`); its two sides are **X** and **Y**.
 - Less clutter: Materials filters (family / type / note) appear only once a search is typed (or a filter is set); Materials CSV import/export sit in a `.page-foot` at the bottom; Dashboard view + sort segments share one row (`.toolbar-pair`).
 - Selected / primary (`.seg-thumb`, `.vchip.on`, `.btn-primary`) = solid black with white text and a light hairline border (like the regular buttons, e.g. Restore) — no light/white fills.
 - Dashboard kicker is hard-coded `Archive · AV27` (owner request).

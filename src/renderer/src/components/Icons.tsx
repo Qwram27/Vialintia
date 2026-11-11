@@ -67,14 +67,11 @@ function NavBase({ size = 18, children, ...rest }: P & { children: React.ReactNo
 export const IconSheet = (p: P) => (
   <NavBase {...p}><path d="M5.5 3h9l4 4v14h-13z" /><path d="M14.5 3v4h4" /><path d="M8.5 11h7M8.5 14h7M8.5 17h4" /></NavBase>
 )
-/** Materials — a pipette, tilted, tip to the lower left. */
+/** Materials — a disposable plastic pipette, tilted, tip to the lower left. */
 export const IconPowder = (p: P) => (
   <NavBase {...p}>
     <g transform="rotate(45 12 12)">
-      <path d="M10 7.5 V4.5 Q10 2.2 12 2.2 Q14 2.2 14 4.5 V7.5" />
-      <path d="M8.8 7.5 H15.2 V9.3 H8.8 Z" />
-      <path d="M10.6 9.3 V16.6 L12 21.4 L13.4 16.6 V9.3" />
-      <path d="M10.6 13.2 H13.4" />
+      <path d="M11.3 10.4 L10.2 8.8 V3.4 Q10.2 2 12 2 Q13.8 2 13.8 3.4 V8.8 L12.7 10.4 V19.6 L12 22.2 L11.3 19.6 Z" />
     </g>
   </NavBase>
 )
