@@ -1,6 +1,6 @@
 import type { Formula, Material, MaterialType, NoteLevel, Settings } from '@shared/types'
 import { NOTE_LABELS, NOTE_ORDER, PRODUCT_PRESETS } from '@shared/defaults'
-import { fmt, fmtSmart, fmtTrim, parseNum, type FormulaCalc } from './calc'
+import { fmt, fmtPct, fmtSmart, fmtTrim, parseNum, type FormulaCalc } from './calc'
 import { parseCsv, toCsv } from './csv'
 import { familyById } from '@/store/store'
 
@@ -103,8 +103,8 @@ export function formulaToPdfHtml(formula: Formula, versionLabel: string, calc: F
         <td class="c">${m ? NOTE_LABELS[m.note] : ''}</td>
         <td class="c">${r.row.dilution < 100 ? `${fmtTrim(r.row.dilution)}% ${esc(r.row.solvent ?? '')}` : '100%'}</td>
         <td>${fmtSmart(r.row.amount)}</td>
-        <td>${fmt(r.weighedPct, 3)}</td>
-        <td>${fmt(r.neatPct, 3)}</td>
+        <td>${fmtPct(r.weighedPct)}</td>
+        <td>${fmtPct(r.neatPct)}</td>
         <td>${ifra ? `${fmtSmart(ifra.limit)}${flag ? ' !' : ''}` : '–'}</td>
         <td>${fmt(r.batchGrams, 3)}</td>
         <td class="chk"></td>
@@ -208,7 +208,7 @@ export function formulaToPdfHtml(formula: Formula, versionLabel: string, calc: F
     <tbody>${rows}</tbody>
     <tfoot><tr>
       <td></td><td class="l">Total</td><td></td><td></td><td></td>
-      <td>${fmtSmart(amountSum)}</td><td>100.000</td><td>${fmt(calc.rows.reduce((s, r) => s + r.neatPct, 0), 3)}</td><td></td><td>${fmt(b.concentrateG, 3)}</td><td></td>
+      <td>${fmtSmart(amountSum)}</td><td>100.0%</td><td>${fmtPct(calc.rows.reduce((s, r) => s + r.neatPct, 0))}</td><td></td><td>${fmt(b.concentrateG, 3)}</td><td></td>
     </tr></tfoot>
   </table>
 

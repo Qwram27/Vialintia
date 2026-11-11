@@ -5,7 +5,7 @@ import { NOTE_LABELS, NOTE_ORDER, PRODUCT_PRESETS } from '@shared/defaults'
 import { currentVersion, familyById, useAccordIndex, useMaterialMap, useStore, withRows } from '@/store/store'
 import { confirmDialog, navigate, openContextMenu, toast, withProgress } from '@/store/ui'
 import { isWeb } from '@/platform'
-import { computeFormula, fmt, fmtSmart, inkOn, moveRow, reduceAccordRow, removeRow, roundToStep, sectionBlocks, stepRow, type RowDrop, rowIfraEntry, scaleRows, type FormulaCalc } from '@/lib/calc'
+import { computeFormula, fmt, fmtPct, fmtSmart, inkOn, moveRow, reduceAccordRow, removeRow, roundToStep, sectionBlocks, stepRow, type RowDrop, rowIfraEntry, scaleRows, type FormulaCalc } from '@/lib/calc'
 import { formulaToCsv, formulaToPdfHtml } from '@/lib/exports'
 import { uid } from '@/lib/id'
 import { NumberInput } from '@/components/NumberInput'
@@ -534,7 +534,7 @@ function SectionHead({
       <span className="spacer" />
       {totals && (
         <small>
-          {fmt(totals.weighed, 2)}% · {totals.count} mat.
+          {fmtPct(totals.weighed)} · {totals.count} mat.
         </small>
       )}
       <button className="btn btn-ghost btn-icon row-del" title="Remove divider" onClick={onRemove}>
@@ -823,8 +823,8 @@ function Composition({
                       )}
                     </div>
                   </td>
-                  <td title={`Neat in concentrate: ${fmtSmart(r.neatPct)}%${r.cost ? ` · cost ${settings.currency}${fmt(r.cost, 2)}` : ''}`}>{fmt(r.weighedPct, 2)}</td>
-                  <td>{fmtSmart(r.neatPct)}</td>
+                  <td title={`Neat in concentrate: ${fmtSmart(r.neatPct)}%${r.cost ? ` · cost ${settings.currency}${fmt(r.cost, 2)}` : ''}`}>{fmtPct(r.weighedPct)}</td>
+                  <td>{fmtPct(r.neatPct)}</td>
                   <td>
                     <IfraBadge entry={rowIfraEntry(calc.ifra, m, accords)} />
                   </td>
@@ -849,8 +849,8 @@ function Composition({
                 <td className="muted" style={{ fontWeight: 400 }}>
                   {formula.unit !== 'g' ? `${fmtSmart(calc.totalGrams)} g` : ''}
                 </td>
-                <td>100.00</td>
-                <td>{fmt(calc.rows.reduce((s, r) => s + (r.neatPct || 0), 0), 2)}</td>
+                <td>100.0%</td>
+                <td>{fmtPct(calc.rows.reduce((s, r) => s + (r.neatPct || 0), 0))}</td>
                 <td />
                 {showBatch && <td>{fmt(calc.batch.concentrateG, 2)}</td>}
                 <td />
@@ -981,7 +981,7 @@ function MobileComposition({
                   )}
                   <span>{r.row.dilution < 100 ? `${fmtSmart(r.row.dilution)}%${r.row.solvent ? ` ${r.row.solvent}` : ''}` : 'neat'}</span>
                   <span>·</span>
-                  <span>{fmtSmart(r.neatPct)}% active</span>
+                  <span>{fmtPct(r.neatPct)} active</span>
                   {showBatch && (
                     <>
                       <span>·</span>
@@ -1008,7 +1008,7 @@ function MobileComposition({
             {fmtSmart(rows.reduce((s, r) => s + (r.amount || 0), 0))} {unit}
             {formula.unit !== 'g' ? ` · ${fmtSmart(calc.totalGrams)} g` : ''}
           </span>
-          <span className="faint">{fmt(formula.concentration, 2)}% in product</span>
+          <span className="faint">{fmtPct(calc.totalGrams > 0 ? (formula.concentration * calc.neatGrams) / calc.totalGrams : formula.concentration)} neat in product</span>
         </div>
       )}
 
@@ -1078,11 +1078,11 @@ function MobileComposition({
           <div className="m-sheet-stats">
             <div>
               <span className="k">Weighed</span>
-              <span className="v">{fmt(editing.weighedPct, 2)}%</span>
+              <span className="v">{fmtPct(editing.weighedPct)}</span>
             </div>
             <div>
               <span className="k">Active</span>
-              <span className="v">{fmtSmart(editing.neatPct)}%</span>
+              <span className="v">{fmtPct(editing.neatPct)}</span>
             </div>
             <div>
               <span className="k">Batch</span>
@@ -1159,6 +1159,7 @@ function Inspector({
   const cur = settings.currency
   const setBatch = (patch: Partial<Formula['batch']>) => update((f) => ({ ...f, batch: { ...f.batch, ...patch } }))
 
+  const finalPct = calc.totalGrams > 0 ? (formula.concentration * calc.neatGrams) / calc.totalGrams : formula.concentration
   const setupPanel = (
     <>
       <section className="insp-sec">
@@ -1200,6 +1201,10 @@ function Inspector({
               <span>%</span>
             </div>
           </div>
+        </div>
+        <div className="stat-row" title="Neat aroma in the finished product: concentration × neat share of the concentrate (solvent in dilutions removed)">
+          <span className="k">Final dilution</span>
+          <span className="v">{fmtPct(finalPct)} neat aroma</span>
         </div>
       </section>
       <section className="insp-sec">

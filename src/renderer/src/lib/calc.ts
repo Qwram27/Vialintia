@@ -364,10 +364,17 @@ export interface DiffRow {
   a: number | null // neat % in concentrate
   b: number | null
   delta: number
+  rel: number | null // relative change after aligning the totals
   kind: DiffKind
 }
 
-export function diffVersions(a: RowCalc[], b: RowCalc[]): DiffRow[] {
+/**
+ * Compares two versions by neat share of the concentrate. Shares are first aligned:
+ * Y is rescaled by the median ratio of the shared materials, so changing one material
+ * (which shifts every other share a little) flags only that material.
+ * `rel` = relative change of the material after alignment (0.12 = +12 %).
+ */
+export function diffVersions(a: RowCalc[], b: RowCalc[], tolerance = 0.01): DiffRow[] {
   const sum = (rows: RowCalc[]) => {
     const m = new Map<string, number>()
     for (const r of rows) m.set(r.row.materialId, (m.get(r.row.materialId) ?? 0) + r.neatPct)
@@ -375,15 +382,21 @@ export function diffVersions(a: RowCalc[], b: RowCalc[]): DiffRow[] {
   }
   const ma = sum(a)
   const mb = sum(b)
+  const ratios = [...ma.keys()]
+    .filter((id) => mb.has(id) && ma.get(id)! > 0 && mb.get(id)! > 0)
+    .map((id) => mb.get(id)! / ma.get(id)!)
+    .sort((x, y) => x - y)
+  const k = ratios.length ? (ratios.length % 2 ? ratios[(ratios.length - 1) / 2] : (ratios[ratios.length / 2 - 1] + ratios[ratios.length / 2]) / 2) : 1
   const ids = [...new Set([...ma.keys(), ...mb.keys()])]
   return ids
     .map((id) => {
       const va = ma.has(id) ? ma.get(id)! : null
       const vb = mb.has(id) ? mb.get(id)! : null
       const delta = (vb ?? 0) - (va ?? 0)
+      const rel = va && vb != null && k > 0 ? vb / k / va - 1 : null
       const kind: DiffKind =
-        va === null ? 'added' : vb === null ? 'removed' : Math.abs(delta) < 0.0005 ? 'same' : 'changed'
-      return { materialId: id, a: va, b: vb, delta, kind }
+        va === null ? 'added' : vb === null ? 'removed' : rel == null ? (Math.abs(delta) < 0.0005 ? 'same' : 'changed') : Math.abs(rel) < tolerance ? 'same' : 'changed'
+      return { materialId: id, a: va, b: vb, delta, rel, kind }
     })
     .sort((x, y) => Math.max(y.a ?? 0, y.b ?? 0) - Math.max(x.a ?? 0, x.b ?? 0))
 }
@@ -559,4 +572,11 @@ export function stepRow(rows: FormulaRow[], rowId: string, dir: -1 | 1): Formula
   if (!row || !other) return rows
   if (dir === -1) return moveRow(rows, rowId, { rowId: other.id, where: row.section != null ? 'below' : 'above' })
   return moveRow(rows, rowId, other.section != null ? { sectionOf: other.id } : { rowId: other.id, where: 'below' })
+}
+
+/** Percentage with one decimal and the % sign (tiny non-zero values keep their precision). */
+export function fmtPct(n: number | null | undefined): string {
+  if (n == null || !Number.isFinite(n)) return '—'
+  if (n !== 0 && Math.abs(n) < 0.05) return `${fmtSmart(n)}%`
+  return `${fmt(n, 1)}%`
 }
