@@ -170,8 +170,10 @@ export function computeIfra(
   rows: RowCalc[],
   concentration: number,
   settings: Settings,
-  accords?: AccordIndex
+  accords?: AccordIndex,
+  neatShare = 1 // neat fraction of the concentrate (dilution solvents excluded)
 ): IfraResult {
+  const f = neatShare > 0 ? neatShare : 1
   const agg = new Map<string, { material: Material; neatPct: number }>()
   const add = (material: Material, neatPct: number) => {
     const cur = agg.get(material.id)
@@ -192,7 +194,7 @@ export function computeIfra(
   for (const { material, neatPct } of agg.values()) {
     const limit = material.ifraLimit
     if (limit == null || !Number.isFinite(limit)) continue
-    const productPct = (neatPct * concentration) / 100
+    const productPct = (neatPct * concentration) / 100 / f
     const status = ifraStatus(productPct, limit, settings.nearLimitRatio)
     const entry: IfraEntry = {
       material,
@@ -205,7 +207,7 @@ export function computeIfra(
     entries.push(entry)
     worst = worstStatus(worst, status)
     if (neatPct > 0) {
-      const max = Math.min(100, (limit / neatPct) * 100)
+      const max = Math.min(100, ((limit * f) / neatPct) * 100)
       if (maxConcentration === null || max < maxConcentration) {
         maxConcentration = max
         limiting = material
@@ -236,8 +238,13 @@ export function rowIfraEntry(ifra: IfraResult, material: Material | undefined, a
   return worst
 }
 
-export function computeBatch(formula: Formula, totalGrams: number, costPerKg: number, settings: Settings): BatchCalc {
+/**
+ * The concentration is the real neat aroma in the finished product: when rows are diluted,
+ * more concentrate is weighed so the product still ends up at the set strength.
+ */
+export function computeBatch(formula: Formula, totalGrams: number, costPerKg: number, settings: Settings, neatShare = 1): BatchCalc {
   const conc = clampPct(formula.concentration)
+  const f = neatShare > 0 ? neatShare : 1
   const b = formula.batch
   let productMl: number
   let productG: number
@@ -245,12 +252,12 @@ export function computeBatch(formula: Formula, totalGrams: number, costPerKg: nu
   if (b.mode === 'mass') {
     // massG = total weight of the finished product (concentrate + alcohol)
     productG = Math.max(0, b.massG || 0)
-    concentrateG = (productG * conc) / 100
+    concentrateG = Math.min(productG, (productG * conc) / 100 / f)
     productMl = settings.productDensity > 0 ? productG / settings.productDensity : 0
   } else {
     productMl = Math.max(0, (b.bottles || 0) * (b.bottleMl || 0))
     productG = productMl * settings.productDensity
-    concentrateG = (productG * conc) / 100
+    concentrateG = Math.min(productG, (productG * conc) / 100 / f)
   }
   const alcoholG = Math.max(0, productG - concentrateG)
   const alcoholMl = settings.ethanolDensity > 0 ? alcoholG / settings.ethanolDensity : 0
@@ -291,7 +298,8 @@ export function computeFormula(
   const neatGrams = base.reduce((s, r) => s + r.neatGrams, 0)
   const cost = base.reduce((s, r) => s + r.cost, 0)
   const costPerKg = totalGrams > 0 ? (cost / totalGrams) * 1000 : 0
-  const batch = computeBatch(formula, totalGrams, costPerKg, settings)
+  const share = totalGrams > 0 && neatGrams > 0 ? neatGrams / totalGrams : 1
+  const batch = computeBatch(formula, totalGrams, costPerKg, settings, share)
 
   const calcRows: RowCalc[] = base.map((r) => {
     const weighedPct = totalGrams > 0 ? (r.grams / totalGrams) * 100 : 0
@@ -300,7 +308,7 @@ export function computeFormula(
       ...r,
       weighedPct,
       neatPct,
-      productPct: (neatPct * conc) / 100,
+      productPct: (neatPct * conc) / 100 / share,
       batchGrams: r.grams * batch.scale
     }
   })
@@ -328,7 +336,7 @@ export function computeFormula(
     byFamily,
     materialCount: new Set(rows.filter((r) => materials.has(r.materialId)).map((r) => r.materialId)).size,
     batch,
-    ifra: computeIfra(calcRows, conc, settings, accords)
+    ifra: computeIfra(calcRows, conc, settings, accords, share)
   }
 }
 
@@ -579,8 +587,7 @@ export function stepRow(rows: FormulaRow[], rowId: string, dir: -1 | 1): Formula
 export function fmtPct(n: number | null | undefined): string {
   if (n == null || !Number.isFinite(n)) return '—'
   const v = Math.abs(n)
-  if (v === 0 || v >= 1) return `${fmt(n, 1)}%`
-  if (v >= 0.1) return `${fmt(n, 2)}%`
+  if (v === 0 || v >= 0.1) return `${fmt(n, 2)}%`
   if (v >= 0.01) return `${fmt(Math.round(n * 100) / 100, 3)}%`
   return `${fmt(n, 3)}%`
 }

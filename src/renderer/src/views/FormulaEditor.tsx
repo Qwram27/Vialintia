@@ -1008,7 +1008,7 @@ function MobileComposition({
             {fmtSmart(rows.reduce((s, r) => s + (r.amount || 0), 0))} {unit}
             {formula.unit !== 'g' ? ` · ${fmtSmart(calc.totalGrams)} g` : ''}
           </span>
-          <span className="faint">{fmtPct(calc.totalGrams > 0 ? (formula.concentration * calc.neatGrams) / calc.totalGrams : formula.concentration)} neat in product</span>
+          <span className="faint">{fmtPct(formula.concentration)} in product</span>
         </div>
       )}
 
@@ -1159,7 +1159,6 @@ function Inspector({
   const cur = settings.currency
   const setBatch = (patch: Partial<Formula['batch']>) => update((f) => ({ ...f, batch: { ...f.batch, ...patch } }))
 
-  const finalPct = calc.totalGrams > 0 ? (formula.concentration * calc.neatGrams) / calc.totalGrams : formula.concentration
   const setupPanel = (
     <>
       <section className="insp-sec">
@@ -1201,10 +1200,6 @@ function Inspector({
               <span>%</span>
             </div>
           </div>
-        </div>
-        <div className="stat-row" title="Neat aroma in the finished product: concentration × neat share of the concentrate (solvent in dilutions removed)">
-          <span className="k">Final dilution</span>
-          <span className="v">{fmtPct(finalPct)} neat aroma</span>
         </div>
       </section>
       <section className="insp-sec">
