@@ -358,7 +358,18 @@ export function evoAxisInv(u: number): number {
   return (1 + EVO_SPLIT_H) * Math.exp(((u - EVO_SPLIT_U) / (1 - EVO_SPLIT_U)) * Math.log((1 + EVO_END_H) / (1 + EVO_SPLIT_H))) - 1
 }
 
-/** Estimated evaporation on a blotter over five days, sampled evenly along `evoAxis`. */
+/**
+ * What you smell from a blotter over five days (sampled evenly along `evoAxis`).
+ *
+ * What reaches the nose is what evaporates, not the mass left behind: a material's
+ * output is its amount × volatility, and volatility is taken as 1 / tenacity, so a
+ * little of a fast top note outweighs a lot of a slow base in the opening. Each
+ * material fades on a log clock and is gone at its tenacity (hours on a blotter,
+ * TGSC substantivity), which is what the blotter data measure.
+ *
+ * Each point = perceived strength (Stevens' power law, output^0.5, 1 at the start)
+ * split into the top / heart / base shares of what is in the air.
+ */
 export function evolution(
   rows: RowCalc[],
   samples = 60
@@ -370,15 +381,25 @@ export function evolution(
       w: r.neatGrams,
       T: Math.max(0.1, r.material!.tenacityHours || DEFAULT_TENACITY[r.material!.note])
     }))
+  const output = (t: number) => {
+    const f = { top: 0, heart: 0, base: 0, all: 0 }
+    for (const it of items) {
+      if (t >= it.T) continue
+      const left = 1 - Math.log(1 + t) / Math.log(1 + it.T)
+      const v = (it.w * left) / it.T
+      f[it.note] += v
+      f.all += v
+    }
+    return f
+  }
+  const f0 = output(0).all
   const points = []
   for (let i = 0; i <= samples; i++) {
     const t = evoAxisInv(i / samples)
-    const p = { t, top: 0, heart: 0, base: 0 }
-    for (const it of items) {
-      const rem = t >= it.T ? 0 : 1 - Math.log(1 + t) / Math.log(1 + it.T)
-      p[it.note] += it.w * rem
-    }
-    points.push(p)
+    const f = output(t)
+    const strength = f0 > 0 && f.all > 0 ? Math.sqrt(f.all / f0) : 0
+    const share = (n: NoteLevel) => (f.all > 0 ? (f[n] / f.all) * strength : 0)
+    points.push({ t, top: share('top'), heart: share('heart'), base: share('base') })
   }
   return { tMax: EVO_END_H, points }
 }
