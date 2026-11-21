@@ -1174,3 +1174,20 @@ svg text { font-family: var(--mono); }
 .ntile.has-img .ntile-mark { z-index: 1; background: rgba(0,0,0,.7); top: 7px; right: 7px; }
 .ntile.has-img .ntile-name { -webkit-line-clamp: 1; white-space: nowrap; text-overflow: ellipsis; display: block; }
 .pyr-actions { flex-wrap: wrap; }
+
+/* note picture dialog */
+.nimg-modal { width: 560px; display: flex; flex-direction: column; gap: 14px; max-height: calc(100vh - 40px); }
+.nimg-modal h3 { margin: 0; }
+.nimg-current { display: flex; align-items: center; gap: 12px; }
+.nimg-current img { width: 56px; height: 56px; border-radius: 5px; object-fit: cover; border: 1px solid var(--line); }
+.nimg-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; min-height: 120px; overflow-y: auto; align-content: start; }
+.nimg-msg { grid-column: 1 / -1; padding: 30px 4px; text-align: center; }
+.nimg-opt { aspect-ratio: 1; padding: 0; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; background: rgba(255,255,255,.03); cursor: pointer; }
+.nimg-opt img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.nimg-opt:hover { border-color: rgba(255,255,255,.5); }
+.nimg-opt.busy { opacity: .4; }
+.modal p.nimg-note { margin: 0; font-size: 10px; color: var(--faint); line-height: 1.5; }
+@media (max-width: 700px) {
+  .nimg-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .nimg-modal .modal-actions { flex-wrap: wrap; }
+}

@@ -1,8 +1,10 @@
-import { Fragment, useMemo, useRef, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import type { Formula, NoteLevel, NotePyramid } from '@shared/types'
 import { NOTE_ORDER } from '@shared/defaults'
 import { NOTE_CATEGORIES, canonicalNote, noteCategory, noteSymbol } from '@/data/noteCatalog'
-import { confirmDialog, toast } from '@/store/ui'
+import { confirmDialog, toast, withProgress } from '@/store/ui'
+import { fileToThumb, noteQuery, searchCommons, urlToThumb, type CommonsImage } from '@/lib/noteImages'
 import { useStore } from '@/store/store'
 import { IconPlus, IconX } from '@/components/Icons'
 import { Seg } from '@/components/Seg'
@@ -11,28 +13,6 @@ const TIER_LABEL: Record<NoteLevel, string> = { top: 'Top notes', heart: 'Heart 
 const TIER_MARK: Record<NoteLevel, string> = { top: 'T', heart: 'H', base: 'B' }
 const EMPTY: NotePyramid = { top: [], heart: [], base: [] }
 const key = (s: string) => s.trim().toLowerCase()
-
-/** Center-crop a picked picture to a small square JPEG (keeps the data file light). */
-async function toThumb(file: File, size = 200): Promise<string> {
-  // data: URL (the page's CSP allows data: images, not blob:)
-  const src = await new Promise<string>((res, rej) => {
-    const r = new FileReader()
-    r.onload = () => res(String(r.result))
-    r.onerror = () => rej(r.error)
-    r.readAsDataURL(file)
-  })
-  const img = new Image()
-  img.src = src
-  await img.decode()
-  const s = Math.min(img.naturalWidth, img.naturalHeight)
-  const c = document.createElement('canvas')
-  c.width = c.height = size
-  const ctx = c.getContext('2d')!
-  ctx.fillStyle = '#000'
-  ctx.fillRect(0, 0, size, size)
-  ctx.drawImage(img, (img.naturalWidth - s) / 2, (img.naturalHeight - s) / 2, s, s, 0, 0, size, size)
-  return c.toDataURL('image/jpeg', 0.82)
-}
 
 type Sel = { tier: NoteLevel; idx: number } | null
 type Drag = { name: string; from: NoteLevel | null } | null
@@ -52,15 +32,42 @@ export function Pyramid({ formula, update }: { formula: Formula; update: (fn: (f
   const fileRef = useRef<HTMLInputElement>(null)
   const imgFor = useRef<string | null>(null)
 
-  const setImage = (name: string, url: string | null) => {
-    const next = { ...(useStore.getState().settings.noteImages ?? {}) }
+  const [imgDialog, setImgDialog] = useState<string | null>(null)
+  const setImage = (name: string, url: string | null, credit?: string) => {
+    const st = useStore.getState().settings
+    const next = { ...(st.noteImages ?? {}) }
+    const cred = { ...(st.noteImageCredits ?? {}) }
     if (url) next[key(name)] = url
     else delete next[key(name)]
-    updateSettings({ noteImages: next })
+    if (url && credit) cred[key(name)] = credit
+    else delete cred[key(name)]
+    updateSettings({ noteImages: next, noteImageCredits: cred })
   }
-  const chooseImage = (name: string) => {
+  const chooseFile = (name: string) => {
     imgFor.current = name
     fileRef.current?.click()
+  }
+
+  /** Fill every placed note that has no picture yet with the first Commons result. */
+  const findAll = async () => {
+    const todo = NOTE_ORDER.flatMap((t) => p[t] ?? []).filter((n) => !images[key(n)])
+    if (!todo.length) return toast('Every note already has a picture')
+    let ok = 0
+    await withProgress('Finding pictures', async (step) => {
+      for (let i = 0; i < todo.length; i++) {
+        step(i / todo.length, `Finding pictures · ${todo[i]}`)
+        try {
+          const hit = (await searchCommons(noteQuery(todo[i]), 3))[0]
+          if (hit) {
+            setImage(todo[i], await urlToThumb(hit.thumb), hit.credit)
+            ok++
+          }
+        } catch {
+          /* offline or nothing found — leave the symbol tile */
+        }
+      }
+    })
+    toast(ok ? `${ok} of ${todo.length} pictures added — tap a note → Image to pick another` : 'No pictures found (are you online?)')
   }
 
   const placed = useMemo(() => {
@@ -202,13 +209,23 @@ export function Pyramid({ formula, update }: { formula: Formula; update: (fn: (f
           const name = imgFor.current
           if (!f || !name) return
           try {
-            setImage(name, await toThumb(f))
+            setImage(name, await fileToThumb(f))
             toast(`Picture set for ${name}`)
           } catch {
             toast('This picture could not be read')
           }
         }}
       />
+      {imgDialog && (
+        <ImageDialog
+          name={imgDialog}
+          current={images[key(imgDialog)]}
+          credit={useStore.getState().settings.noteImageCredits?.[key(imgDialog)]}
+          onPick={(url, credit) => setImage(imgDialog, url, credit)}
+          onFile={() => chooseFile(imgDialog)}
+          onClose={() => setImgDialog(null)}
+        />
+      )}
       <div className="pyr-head">
         <span className="label">Note pyramid</span>
         <span className="faint small">{String(total).padStart(2, '0')}</span>
@@ -224,6 +241,11 @@ export function Pyramid({ formula, update }: { formula: Formula; update: (fn: (f
             }}
           >
             Clear
+          </button>
+        )}
+        {total > 0 && !picking && (
+          <button className="btn btn-sm" title="Look up pictures on Wikimedia Commons for notes that have none" onClick={findAll}>
+            Find pictures
           </button>
         )}
         <button className={`btn btn-sm${picking ? ' btn-primary' : ''}`} onClick={() => setPicking(!picking)}>
@@ -283,20 +305,9 @@ export function Pyramid({ formula, update }: { formula: Formula; update: (fn: (f
                     <button className="btn btn-sm" title="Move right" disabled={sel.idx >= list.length - 1} onClick={() => shift(1)}>→</button>
                     <button className="btn btn-sm" title="Up a tier" disabled={t === 'top'} onClick={() => toTier(-1)}>↑</button>
                     <button className="btn btn-sm" title="Down a tier" disabled={t === 'base'} onClick={() => toTier(1)}>↓</button>
-                    <button className="btn btn-sm" title="Add or change the picture of this note (used in every formula)" onClick={() => chooseImage(selName)}>
+                    <button className="btn btn-sm" title="Picture of this note (shared by every formula)" onClick={() => setImgDialog(selName)}>
                       {images[key(selName)] ? 'Image' : <><IconPlus size={12} /> Image</>}
                     </button>
-                    {images[key(selName)] && (
-                      <button
-                        className="btn btn-sm"
-                        title="Remove the picture (back to the symbol tile)"
-                        onClick={async () => {
-                          if (await confirmDialog('Remove picture?', `${selName} goes back to its symbol tile in every formula.`, 'Remove')) setImage(selName, null)
-                        }}
-                      >
-                        No image
-                      </button>
-                    )}
                     <button className="btn btn-sm btn-icon" title="Remove from the pyramid" onClick={() => remove(selName)}>
                       <IconX size={14} />
                     </button>
@@ -391,5 +402,113 @@ export function Pyramid({ formula, update }: { formula: Formula; update: (fn: (f
       )}
     </div>
     </div>
+  )
+}
+
+/** Choose a note's picture: Wikimedia Commons results, a file from the device, or none. */
+function ImageDialog({
+  name, current, credit, onPick, onFile, onClose
+}: {
+  name: string
+  current?: string
+  credit?: string
+  onPick: (url: string | null, credit?: string) => void
+  onFile: () => void
+  onClose: () => void
+}) {
+  const [q, setQ] = useState(noteQuery(name))
+  const [results, setResults] = useState<CommonsImage[] | null>(null)
+  const [state, setState] = useState<'idle' | 'loading' | 'error'>('idle')
+  const [busy, setBusy] = useState<string | null>(null)
+
+  const search = async (text: string) => {
+    if (!text.trim()) return
+    setState('loading')
+    try {
+      setResults(await searchCommons(text.trim(), 12))
+      setState('idle')
+    } catch {
+      setResults(null)
+      setState('error')
+    }
+  }
+  useEffect(() => {
+    search(q)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const use = async (r: CommonsImage) => {
+    setBusy(r.thumb)
+    try {
+      onPick(await urlToThumb(r.thumb), r.credit)
+      toast(`Picture set for ${name}`)
+      onClose()
+    } catch {
+      toast('This picture could not be downloaded')
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  return createPortal(
+    <div className="overlay confirm-overlay" onMouseDown={onClose}>
+      <div className="modal nimg-modal" onMouseDown={(e) => e.stopPropagation()}>
+        <h3>Picture · {name}</h3>
+        {current && (
+          <div className="nimg-current">
+            <img src={current} alt="" />
+            <div className="small muted">{credit ? <>Wikimedia Commons<br />{credit}</> : 'Own picture'}</div>
+          </div>
+        )}
+        <form
+          className="row"
+          style={{ gap: 8 }}
+          onSubmit={(e) => {
+            e.preventDefault()
+            search(q)
+          }}
+        >
+          <input className="input" style={{ flex: 1 }} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search pictures…" />
+          <button className="btn" type="submit">Search</button>
+        </form>
+        <div className="nimg-grid">
+          {state === 'loading' && <div className="faint small nimg-msg">Searching Wikimedia Commons…</div>}
+          {state === 'error' && <div className="faint small nimg-msg">No connection to Wikimedia Commons. Pictures can be looked up when online — or use one from this device.</div>}
+          {state === 'idle' && results?.length === 0 && <div className="faint small nimg-msg">Nothing found — try other words.</div>}
+          {state === 'idle' &&
+            results?.map((r) => (
+              <button key={r.thumb} type="button" className={`nimg-opt${busy === r.thumb ? ' busy' : ''}`} title={`${r.title}\n${r.credit}`} disabled={!!busy} onClick={() => use(r)}>
+                <img src={r.thumb} alt={r.title} loading="lazy" />
+              </button>
+            ))}
+        </div>
+        <p className="nimg-note">Freely licensed pictures from Wikimedia Commons, saved only on this device. Author and licence are kept with the picture.</p>
+        <div className="modal-actions">
+          {current && (
+            <button
+              className="btn btn-ghost"
+              onClick={() => {
+                onPick(null)
+                onClose()
+              }}
+            >
+              No image
+            </button>
+          )}
+          <div className="spacer" />
+          <button
+            className="btn"
+            onClick={() => {
+              onFile()
+              onClose()
+            }}
+          >
+            From device…
+          </button>
+          <button className="btn btn-ghost" onClick={onClose}>Close</button>
+        </div>
+      </div>
+    </div>,
+    document.body
   )
 }

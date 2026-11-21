@@ -133,6 +133,8 @@ export interface Settings {
   seedVersion?: number // starter-library version already merged into this library
   /** User pictures for pyramid notes: lower-case note name → small JPEG data URL. */
   noteImages?: Record<string, string>
+  /** Author · licence of pictures taken from Wikimedia Commons (same keys). */
+  noteImageCredits?: Record<string, string>
 }
 
 export interface AppData {
