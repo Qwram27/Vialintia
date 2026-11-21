@@ -1187,3 +1187,17 @@ svg text { font-family: var(--mono); }
   .cmp-tile { padding: 12px; }
   .cmp-tile .v { font-size: 22px; }
 }
+
+/* notes first, pyramid below; balanced, self-scaling tier rows */
+.notes-head { border-top: 0; padding-top: 6px; }
+.pyr-wrap { margin: 26px 0 0; padding-top: 18px; border-top: 1px solid var(--line-soft); }
+.pyr-tiles-wrap { width: 100%; display: flex; justify-content: center; }
+.pyr-tiles { gap: var(--tg, 8px); min-height: 0; width: 100%; }
+.pyr-tiles-wrap { min-height: 84px; align-items: center; }
+.pyr-tiles .ntile { width: var(--ts, 84px); height: var(--ts, 84px); }
+.pyr-tiles .ntile-sym { font-size: calc(var(--ts, 84px) * .25); }
+.pyr-tiles .ntile:not(.has-img) { padding-top: calc(var(--ts, 84px) * .16); }
+@media (max-width: 700px) {
+  .pyr-wrap { margin-top: 20px; }
+  .pyr-tiles-wrap { min-height: 64px; }
+}

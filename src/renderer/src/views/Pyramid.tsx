@@ -1,4 +1,5 @@
-import { Fragment, useMemo, useRef, useState } from 'react'
+import { Fragment, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useIsMobile } from '@/lib/useMobile'
 import type { Formula, NoteLevel, NotePyramid } from '@shared/types'
 import { NOTE_ORDER } from '@shared/defaults'
 import { NOTE_CATEGORIES, canonicalNote, noteCategory, noteSymbol } from '@/data/noteCatalog'
@@ -261,7 +262,7 @@ export function Pyramid({ formula, update }: { formula: Formula; update: (fn: (f
                   <div className="spacer" />
                   {picking && active === t && <span className="pyr-hint">Adding here</span>}
                 </div>
-                <div className="pyr-tiles">
+                <BalancedTiles count={list.length}>
                   {list.map((n, i) =>
                     tile(n, {
                       tier: t,
@@ -274,7 +275,7 @@ export function Pyramid({ formula, update }: { formula: Formula; update: (fn: (f
                     })
                   )}
                   {list.length === 0 && <div className="pyr-empty">{picking ? (active === t ? 'Pick notes from the catalogue' : 'Tap to add notes here') : '—'}</div>}
-                </div>
+                </BalancedTiles>
                 {sel?.tier === t && selName && (
                   <div className="pyr-actions" onClick={(e) => e.stopPropagation()}>
                     <span className="pyr-sel-name">{selName}</span>
@@ -390,6 +391,46 @@ export function Pyramid({ formula, update }: { formula: Formula; update: (fn: (f
       </div>
       )}
     </div>
+    </div>
+  )
+}
+
+/**
+ * Tier row layout: tiles shrink (down to a minimum) when that saves a row, and
+ * rows are balanced — 5 notes go 3 + 2, not 4 + 1 with one tile left hanging.
+ */
+function BalancedTiles({ count, children }: { count: number; children: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null)
+  const mobile = useIsMobile()
+  const [w, setW] = useState(0)
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const measure = () => setW(el.clientWidth)
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+
+  const sizes = mobile ? [76, 68, 60] : [84, 76, 68]
+  const gap = mobile ? 6 : 8
+  let size = sizes[0]
+  let per = count
+  if (w > 0 && count > 0) {
+    const fit = (s: number) => Math.max(1, Math.floor((w + gap) / (s + gap)))
+    const rowsAt = sizes.map((s) => Math.ceil(count / fit(s)))
+    const minRows = Math.min(...rowsAt)
+    size = sizes[rowsAt.indexOf(minRows)] // largest size that needs the fewest rows
+    per = Math.ceil(count / minRows) // spread evenly over those rows
+  }
+  const maxWidth = count > 0 && w > 0 ? per * size + (per - 1) * gap : undefined
+
+  return (
+    <div ref={ref} className="pyr-tiles-wrap">
+      <div className="pyr-tiles" style={{ ['--ts' as string]: `${size}px`, ['--tg' as string]: `${gap}px`, maxWidth }}>
+        {children}
+      </div>
     </div>
   )
 }
