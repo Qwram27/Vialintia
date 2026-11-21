@@ -1466,7 +1466,6 @@ function Notes({ formula, update }: { formula: Formula; update: (fn: (f: Formula
 
   return (
     <div>
-      <Pyramid formula={formula} update={update} />
       <div className="notes-head">
         <span className="label">Test notes</span>
         <span className="faint small">{String(formula.notes.length).padStart(2, '0')}</span>
@@ -1535,6 +1534,7 @@ function Notes({ formula, update }: { formula: Formula; update: (fn: (f: Formula
         ))}
         {notes.length === 0 && <div className="muted small">No test notes yet.</div>}
       </div>
+      <Pyramid formula={formula} update={update} />
     </div>
   )
 }
