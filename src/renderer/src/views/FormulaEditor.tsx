@@ -16,6 +16,7 @@ import { Seg } from '@/components/Seg'
 import { catalogNo, seasonCode, shortDate } from '@/lib/archive'
 import { Stars } from '@/components/Overlays'
 import { Sheet } from '@/components/Sheet'
+import { Pyramid } from '@/views/Pyramid'
 import { useIsMobile } from '@/lib/useMobile'
 import {
   IconAlert, IconAnalyze, IconCheck, IconPercent, IconCopy, IconDownload, IconFile, IconGrip, IconPlus,
@@ -1465,6 +1466,11 @@ function Notes({ formula, update }: { formula: Formula; update: (fn: (f: Formula
 
   return (
     <div>
+      <Pyramid formula={formula} update={update} />
+      <div className="notes-head">
+        <span className="label">Test notes</span>
+        <span className="faint small">{String(formula.notes.length).padStart(2, '0')}</span>
+      </div>
       <div className="card card-pad" style={{ background: 'var(--panel-2)', marginBottom: 16 }}>
         <div className="row mb" style={{ gap: 10, flexWrap: 'wrap' }}>
           <span className="label">New note for</span>
