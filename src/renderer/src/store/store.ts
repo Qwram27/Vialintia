@@ -92,6 +92,11 @@ function normalizeFormula(f: Formula): Formula {
     tags: f.tags ?? [],
     notes: f.notes ?? [],
     assemblies: f.assemblies ?? [],
+    pyramid: {
+      top: Array.isArray(f.pyramid?.top) ? f.pyramid.top : [],
+      heart: Array.isArray(f.pyramid?.heart) ? f.pyramid.heart : [],
+      base: Array.isArray(f.pyramid?.base) ? f.pyramid.base : []
+    },
     description: f.description ?? '',
     batch: { ...{ mode: 'bottles' as const, bottles: 1, bottleMl: 50, massG: 10 }, ...(f.batch ?? {}) },
     currentVersionId: versions.some((v) => v.id === f.currentVersionId) ? f.currentVersionId : versions[versions.length - 1].id

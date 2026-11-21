@@ -138,6 +138,7 @@ export function formulaToPdfHtml(formula: Formula, versionLabel: string, calc: F
     .join('')
 
   const structure = NOTE_ORDER.map((n) => `${NOTE_LABELS[n]} ${noteTotal > 0 ? fmt((calc.byNote[n] / noteTotal) * 100, 1) : '–'} %`).join('   ·   ')
+  const pyramid = NOTE_ORDER.filter((n) => formula.pyramid?.[n]?.length).map((n) => `${NOTE_LABELS[n]}: ${formula.pyramid![n].map(esc).join(', ')}`).join('   ·   ')
 
   return `<!doctype html><html><head><meta charset="utf-8"><title>${esc(formula.name)}</title>
 <style>
@@ -215,6 +216,7 @@ export function formulaToPdfHtml(formula: Formula, versionLabel: string, calc: F
 
   <div class="summary">
     <b>Structure:</b> ${structure}<br>
+    ${pyramid ? `<b>Pyramid:</b> ${pyramid}<br>` : ''}
     ${calc.costPerKg > 0 ? `<b>Cost:</b> ${cur} ${fmt(calc.costPerKg, 2)} / kg concentrate${b.costPerBottle != null ? ` · ${cur} ${fmt(b.costPerBottle, 2)} per bottle` : ''} · batch ${cur} ${fmt(b.costTotal, 2)}<br>` : ''}
     <b>IFRA (Cat. 4):</b> ${
       calc.ifra.entries.length === 0

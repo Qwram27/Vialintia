@@ -76,9 +76,17 @@ export interface Formula {
   versions: FormulaVersion[]
   currentVersionId: string
   notes: TestNote[]
+  /** Olfactive pyramid as it would be presented (note names, ordered). */
+  pyramid?: NotePyramid
   assemblies?: Assembly[] // weighing sessions; the last one without finishedAt is in progress
   createdAt: string
   updatedAt: string
+}
+
+export interface NotePyramid {
+  top: string[]
+  heart: string[]
+  base: string[]
 }
 
 export interface AssemblyRow {
