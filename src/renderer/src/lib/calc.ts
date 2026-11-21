@@ -341,9 +341,14 @@ export function computeFormula(
 }
 
 /** Estimated evaporation profile: remaining neat mass per note over time (log time). */
+/**
+ * Estimated evaporation on a blotter over the first two days (`tMax` h). Later on
+ * only the base is left, so the curve stops there and shows what remains.
+ */
 export function evolution(
   rows: RowCalc[],
-  samples = 60
+  samples = 60,
+  tMax = 48
 ): { tMax: number; points: { t: number; top: number; heart: number; base: number }[] } {
   const items = rows
     .filter((r) => r.material && r.neatGrams > 0)
@@ -352,7 +357,6 @@ export function evolution(
       w: r.neatGrams,
       T: Math.max(0.1, r.material!.tenacityHours || DEFAULT_TENACITY[r.material!.note])
     }))
-  const tMax = Math.max(24, ...items.map((i) => i.T))
   const lnMax = Math.log(1 + tMax)
   const points = []
   for (let i = 0; i <= samples; i++) {

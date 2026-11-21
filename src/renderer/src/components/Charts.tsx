@@ -122,7 +122,7 @@ export function FamilyDonut({
 // ---------- Evolution curve ----------
 function fmtTime(h: number): string {
   if (h < 1) return `${Math.round(h * 60)}m`
-  if (h < 48) return `${h < 10 ? fmt(h, 1).replace(/\.0$/, '') : Math.round(h)}h`
+  if (h < 48.5) return `${h < 10 ? fmt(h, 1).replace(/\.0$/, '') : Math.round(h)}h`
   return `${Math.round(h / 24)}d`
 }
 
@@ -156,7 +156,9 @@ export function EvolutionChart({ rows, settings }: { rows: RowCalc[]; settings: 
     return { note, d, top: upper }
   })
 
-  const ticks = [0.25, 1, 4, 12, 24, 72, 168, 336].filter((t) => t <= data.tMax)
+  const ticks = [0.25, 1, 4, 12, 24, 48].filter((t) => t <= data.tMax)
+  const end = data.points[data.points.length - 1]
+  const endLeft = end.top + end.heart + end.base
   const hp = hi != null ? data.points[hi] : null
   const hpTotal = hp ? hp.top + hp.heart + hp.base : 0
 
@@ -167,18 +169,25 @@ export function EvolutionChart({ rows, settings }: { rows: RowCalc[]; settings: 
         viewBox={`0 0 ${W} ${H}`}
         role="img"
         aria-label="Estimated evaporation curve"
-        onMouseMove={(e) => {
+        style={{ touchAction: 'pan-y' }}
+        onPointerMove={(e) => {
           const rect = e.currentTarget.getBoundingClientRect()
           const px = ((e.clientX - rect.left) / rect.width) * W
           const frac = Math.min(1, Math.max(0, (px - padL) / (W - padL * 2)))
           setHi(Math.round(frac * (data.points.length - 1)))
         }}
-        onMouseLeave={() => setHi(null)}
+        onPointerDown={(e) => {
+          const rect = e.currentTarget.getBoundingClientRect()
+          const px = ((e.clientX - rect.left) / rect.width) * W
+          const frac = Math.min(1, Math.max(0, (px - padL) / (W - padL * 2)))
+          setHi(Math.round(frac * (data.points.length - 1)))
+        }}
+        onPointerLeave={(e) => e.pointerType === 'mouse' && setHi(null)}
       >
         {ticks.map((t) => (
           <g key={t}>
             <line x1={x(t)} x2={x(t)} y1={0} y2={H - padB} stroke="var(--line-soft)" />
-            <text x={x(t)} y={H - 4} fontSize="9" fill="var(--faint)" textAnchor="middle">
+            <text x={x(t)} y={H - 4} fontSize="9" fill="var(--faint)" textAnchor={t === ticks[ticks.length - 1] && t >= data.tMax - 0.5 ? 'end' : t === ticks[0] && x(t) < 14 ? 'start' : 'middle'}>
               {fmtTime(t)}
             </text>
           </g>
@@ -218,7 +227,9 @@ export function EvolutionChart({ rows, settings }: { rows: RowCalc[]; settings: 
         </div>
       )}
       <div className="row small faint" style={{ justifyContent: 'space-between', marginTop: 4 }}>
-        <span>EST. · LOG TIME</span>
+        <span style={{ whiteSpace: 'nowrap' }} title="Estimated share of the concentrate still on the blotter after two days">
+          {fmtTime(data.tMax).toUpperCase()} · {endLeft > 0 ? `${fmt((endLeft / max) * 100, 0)}% LEFT` : 'GONE'}
+        </span>
         <span className="row" style={{ gap: 10 }}>
           {(['top', 'heart', 'base'] as NoteLevel[]).map((n) => (
             <span key={n} className="row" style={{ gap: 4 }}>

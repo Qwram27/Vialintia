@@ -172,6 +172,20 @@ describe('helpers', () => {
     expect(e.points[0].top).toBeCloseTo(1)
     expect(e.points[e.points.length - 1].top).toBe(0)
   })
+
+  it('evolution stops at two days with the base still there', () => {
+    const materials = new Map([
+      ['a', mat('a', { tenacityHours: 2, note: 'top' })],
+      ['b', mat('b', { tenacityHours: 400, note: 'base' })]
+    ])
+    const c = computeFormula(formula(), [{ id: '1', materialId: 'a', amount: 1, dilution: 100 }, { id: '2', materialId: 'b', amount: 1, dilution: 100 }], materials, settings)
+    const e = evolution(c.rows, 20)
+    const last = e.points[e.points.length - 1]
+    expect(e.tMax).toBe(48)
+    expect(last.t).toBeCloseTo(48)
+    expect(last.top).toBe(0)
+    expect(last.base).toBeGreaterThan(0.2)
+  })
 })
 
 describe('archive codes', async () => {
