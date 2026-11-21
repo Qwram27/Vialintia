@@ -155,7 +155,7 @@ export function EvolutionChart({ rows, settings }: { rows: RowCalc[]; settings: 
     return { note, d, top: upper }
   })
 
-  const ticks = [0.25, 1, 4, 12, 24, 48, 168]
+  const ticks = [0.25, 1, 4, 12, 24, 48, 120]
   const end = data.points[data.points.length - 1]
   const endLeft = end.top + end.heart + end.base
   const hp = hi != null ? data.points[hi] : null
@@ -183,7 +183,7 @@ export function EvolutionChart({ rows, settings }: { rows: RowCalc[]; settings: 
         }}
         onPointerLeave={(e) => e.pointerType === 'mouse' && setHi(null)}
       >
-        {/* days 3–7, squeezed */}
+        {/* days 3–5, squeezed */}
         <rect x={x(EVO_SPLIT_H)} y={0} width={x(data.tMax) - x(EVO_SPLIT_H)} height={H - padB} fill="rgba(255,255,255,.025)" />
         {ticks.map((t) => (
           <g key={t}>
@@ -228,7 +228,7 @@ export function EvolutionChart({ rows, settings }: { rows: RowCalc[]; settings: 
         </div>
       )}
       <div className="row small faint" style={{ justifyContent: 'space-between', marginTop: 4 }}>
-        <span style={{ whiteSpace: 'nowrap' }} title="Estimated share of the concentrate still on the blotter after a week">
+        <span style={{ whiteSpace: 'nowrap' }} title="Estimated share of the concentrate still on the blotter after five days">
           {fmtTime(data.tMax).toUpperCase()} · {endLeft > 0 ? `${(endLeft / max) * 100 < 1 ? '<1' : fmt((endLeft / max) * 100, 0)}% LEFT` : 'GONE'}
         </span>
         <span className="row" style={{ gap: 10 }}>

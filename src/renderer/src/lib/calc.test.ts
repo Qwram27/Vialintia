@@ -173,7 +173,7 @@ describe('helpers', () => {
     expect(e.points[e.points.length - 1].top).toBe(0)
   })
 
-  it('evolution runs a week, the days after 48 h squeezed at the end', () => {
+  it('evolution runs five days, the days after 48 h squeezed at the end', () => {
     const materials = new Map([
       ['a', mat('a', { tenacityHours: 2, note: 'top' })],
       ['b', mat('b', { tenacityHours: 400, note: 'base' })]
@@ -181,8 +181,8 @@ describe('helpers', () => {
     const c = computeFormula(formula(), [{ id: '1', materialId: 'a', amount: 1, dilution: 100 }, { id: '2', materialId: 'b', amount: 1, dilution: 100 }], materials, settings)
     const e = evolution(c.rows, 20)
     const last = e.points[e.points.length - 1]
-    expect(e.tMax).toBe(168)
-    expect(last.t).toBeCloseTo(168)
+    expect(e.tMax).toBe(120)
+    expect(last.t).toBeCloseTo(120)
     expect(evoAxis(48)).toBeCloseTo(0.85)
     expect(evoAxisInv(evoAxis(100))).toBeCloseTo(100)
     expect(last.top).toBe(0)

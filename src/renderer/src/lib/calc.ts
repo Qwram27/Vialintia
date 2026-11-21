@@ -343,21 +343,22 @@ export function computeFormula(
 /** Estimated evaporation profile: remaining neat mass per note over time (log time). */
 /**
  * Time axis of the evaporation chart: the first two days on a log scale take most
- * of the width, the rest of the week is squeezed into a thin strip at the end.
+ * of the width, days 3–5 are squeezed into a thin strip at the end.
  */
 export const EVO_SPLIT_H = 48
-export const EVO_END_H = 168
+export const EVO_END_H = 120
 const EVO_SPLIT_U = 0.85
 export function evoAxis(t: number): number {
   if (t <= EVO_SPLIT_H) return (EVO_SPLIT_U * Math.log(1 + t)) / Math.log(1 + EVO_SPLIT_H)
-  return EVO_SPLIT_U + ((1 - EVO_SPLIT_U) * Math.min(t - EVO_SPLIT_H, EVO_END_H - EVO_SPLIT_H)) / (EVO_END_H - EVO_SPLIT_H)
+  // tail stays logarithmic (nearly the same slope at 48 h), so the curve has no kink
+  return EVO_SPLIT_U + ((1 - EVO_SPLIT_U) * Math.log((1 + Math.min(t, EVO_END_H)) / (1 + EVO_SPLIT_H))) / Math.log((1 + EVO_END_H) / (1 + EVO_SPLIT_H))
 }
 export function evoAxisInv(u: number): number {
   if (u <= EVO_SPLIT_U) return Math.exp((u / EVO_SPLIT_U) * Math.log(1 + EVO_SPLIT_H)) - 1
-  return EVO_SPLIT_H + ((u - EVO_SPLIT_U) / (1 - EVO_SPLIT_U)) * (EVO_END_H - EVO_SPLIT_H)
+  return (1 + EVO_SPLIT_H) * Math.exp(((u - EVO_SPLIT_U) / (1 - EVO_SPLIT_U)) * Math.log((1 + EVO_END_H) / (1 + EVO_SPLIT_H))) - 1
 }
 
-/** Estimated evaporation on a blotter over one week, sampled evenly along `evoAxis`. */
+/** Estimated evaporation on a blotter over five days, sampled evenly along `evoAxis`. */
 export function evolution(
   rows: RowCalc[],
   samples = 60
