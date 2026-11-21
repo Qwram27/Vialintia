@@ -341,6 +341,24 @@ export function computeFormula(
 }
 
 /** Estimated evaporation profile: remaining neat mass per note over time (log time). */
+/**
+ * Time axis of the evaporation chart: the first two days on a log scale take most
+ * of the width, days 3–5 are squeezed into a thin strip at the end.
+ */
+export const EVO_SPLIT_H = 48
+export const EVO_END_H = 120
+const EVO_SPLIT_U = 0.85
+export function evoAxis(t: number): number {
+  if (t <= EVO_SPLIT_H) return (EVO_SPLIT_U * Math.log(1 + t)) / Math.log(1 + EVO_SPLIT_H)
+  // tail stays logarithmic (nearly the same slope at 48 h), so the curve has no kink
+  return EVO_SPLIT_U + ((1 - EVO_SPLIT_U) * Math.log((1 + Math.min(t, EVO_END_H)) / (1 + EVO_SPLIT_H))) / Math.log((1 + EVO_END_H) / (1 + EVO_SPLIT_H))
+}
+export function evoAxisInv(u: number): number {
+  if (u <= EVO_SPLIT_U) return Math.exp((u / EVO_SPLIT_U) * Math.log(1 + EVO_SPLIT_H)) - 1
+  return (1 + EVO_SPLIT_H) * Math.exp(((u - EVO_SPLIT_U) / (1 - EVO_SPLIT_U)) * Math.log((1 + EVO_END_H) / (1 + EVO_SPLIT_H))) - 1
+}
+
+/** Estimated evaporation on a blotter over five days, sampled evenly along `evoAxis`. */
 export function evolution(
   rows: RowCalc[],
   samples = 60
@@ -352,11 +370,9 @@ export function evolution(
       w: r.neatGrams,
       T: Math.max(0.1, r.material!.tenacityHours || DEFAULT_TENACITY[r.material!.note])
     }))
-  const tMax = Math.max(24, ...items.map((i) => i.T))
-  const lnMax = Math.log(1 + tMax)
   const points = []
   for (let i = 0; i <= samples; i++) {
-    const t = Math.exp((i / samples) * lnMax) - 1
+    const t = evoAxisInv(i / samples)
     const p = { t, top: 0, heart: 0, base: 0 }
     for (const it of items) {
       const rem = t >= it.T ? 0 : 1 - Math.log(1 + t) / Math.log(1 + it.T)
@@ -364,7 +380,7 @@ export function evolution(
     }
     points.push(p)
   }
-  return { tMax, points }
+  return { tMax: EVO_END_H, points }
 }
 
 export type DiffKind = 'added' | 'removed' | 'changed' | 'same'

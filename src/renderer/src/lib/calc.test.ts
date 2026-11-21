@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_SETTINGS } from '@shared/defaults'
 import type { Formula, Material } from '@shared/types'
-import { buildAccordIndex, computeFormula, diffVersions, evolution, ifraStatus, moveRow, parseNum, reduceAccordRow, removeRow, roundToStep, sectionBlocks, stepRow, rowIfraEntry, scaleRows } from './calc'
+import { buildAccordIndex, computeFormula, diffVersions, evoAxis, evoAxisInv, evolution, ifraStatus, moveRow, parseNum, reduceAccordRow, removeRow, roundToStep, sectionBlocks, stepRow, rowIfraEntry, scaleRows } from './calc'
 import { SEED_VERSION, seedMaterials, upgradeSeedLibrary } from '@/data/seedMaterials'
 
 const now = new Date().toISOString()
@@ -171,6 +171,22 @@ describe('helpers', () => {
     const e = evolution(c.rows, 20)
     expect(e.points[0].top).toBeCloseTo(1)
     expect(e.points[e.points.length - 1].top).toBe(0)
+  })
+
+  it('evolution runs five days, the days after 48 h squeezed at the end', () => {
+    const materials = new Map([
+      ['a', mat('a', { tenacityHours: 2, note: 'top' })],
+      ['b', mat('b', { tenacityHours: 400, note: 'base' })]
+    ])
+    const c = computeFormula(formula(), [{ id: '1', materialId: 'a', amount: 1, dilution: 100 }, { id: '2', materialId: 'b', amount: 1, dilution: 100 }], materials, settings)
+    const e = evolution(c.rows, 20)
+    const last = e.points[e.points.length - 1]
+    expect(e.tMax).toBe(120)
+    expect(last.t).toBeCloseTo(120)
+    expect(evoAxis(48)).toBeCloseTo(0.85)
+    expect(evoAxisInv(evoAxis(100))).toBeCloseTo(100)
+    expect(last.top).toBe(0)
+    expect(last.base).toBeGreaterThan(0.1)
   })
 })
 
