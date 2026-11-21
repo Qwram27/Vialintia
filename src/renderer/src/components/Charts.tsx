@@ -217,6 +217,11 @@ export function EvolutionChart({ rows, settings }: { rows: RowCalc[]; settings: 
           }}
         >
           <div style={{ color: 'var(--text)', marginBottom: 4, letterSpacing: '.1em' }}>T+{fmtTime(hp.t).toUpperCase()}</div>
+          <div className="row" style={{ gap: 6, marginBottom: 3 }}>
+            <span className="muted">Strength</span>
+            <span className="spacer" />
+            <span className="num">{fmt((hpTotal / max) * 100, 0)}%</span>
+          </div>
           {(['top', 'heart', 'base'] as NoteLevel[]).map((n) => (
             <div key={n} className="row" style={{ gap: 6 }}>
               <span className="dot" style={{ background: settings.noteColors[n], width: 7, height: 7 }} />
@@ -228,8 +233,8 @@ export function EvolutionChart({ rows, settings }: { rows: RowCalc[]; settings: 
         </div>
       )}
       <div className="row small faint" style={{ justifyContent: 'space-between', marginTop: 4 }}>
-        <span style={{ whiteSpace: 'nowrap' }} title="Estimated share of the concentrate still on the blotter after five days">
-          {fmtTime(data.tMax).toUpperCase()} · {endLeft > 0 ? `${(endLeft / max) * 100 < 1 ? '<1' : fmt((endLeft / max) * 100, 0)}% LEFT` : 'GONE'}
+        <span style={{ whiteSpace: 'nowrap' }} title="Estimated scent strength after five days (1 = the opening). Height = strength, bands = what the air smells of.">
+          {fmtTime(data.tMax).toUpperCase()} · {endLeft > 0 ? `STRENGTH ${(endLeft / max) * 100 < 1 ? '<1' : fmt((endLeft / max) * 100, 0)}%` : 'GONE'}
         </span>
         <span className="row" style={{ gap: 10 }}>
           {(['top', 'heart', 'base'] as NoteLevel[]).map((n) => (

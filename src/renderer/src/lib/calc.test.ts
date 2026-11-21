@@ -165,7 +165,7 @@ describe('helpers', () => {
     expect(d.find((x) => x.materialId === 'c')!.kind).toBe('added')
   })
 
-  it('evolution decays to zero', () => {
+  it('evolution: a top note alone fades out', () => {
     const materials = new Map([['a', mat('a', { tenacityHours: 4, note: 'top' })]])
     const c = computeFormula(formula(), [{ id: '1', materialId: 'a', amount: 1, dilution: 100 }], materials, settings)
     const e = evolution(c.rows, 20)
@@ -173,20 +173,24 @@ describe('helpers', () => {
     expect(e.points[e.points.length - 1].top).toBe(0)
   })
 
-  it('evolution runs five days, the days after 48 h squeezed at the end', () => {
+  it('evolution follows volatility, not amount', () => {
+    // 1 part top note vs 9 parts base: the opening still smells mostly of the top note
     const materials = new Map([
       ['a', mat('a', { tenacityHours: 2, note: 'top' })],
       ['b', mat('b', { tenacityHours: 400, note: 'base' })]
     ])
-    const c = computeFormula(formula(), [{ id: '1', materialId: 'a', amount: 1, dilution: 100 }, { id: '2', materialId: 'b', amount: 1, dilution: 100 }], materials, settings)
-    const e = evolution(c.rows, 20)
+    const c = computeFormula(formula(), [{ id: '1', materialId: 'a', amount: 1, dilution: 100 }, { id: '2', materialId: 'b', amount: 9, dilution: 100 }], materials, settings)
+    const e = evolution(c.rows, 40)
+    const first = e.points[0]
     const last = e.points[e.points.length - 1]
+    expect(first.top).toBeGreaterThan(first.base * 5)
     expect(e.tMax).toBe(120)
     expect(last.t).toBeCloseTo(120)
+    expect(last.top).toBe(0)
+    expect(last.base).toBeGreaterThan(0)
+    expect(last.base).toBeLessThan(first.top + first.base)
     expect(evoAxis(48)).toBeCloseTo(0.85)
     expect(evoAxisInv(evoAxis(100))).toBeCloseTo(100)
-    expect(last.top).toBe(0)
-    expect(last.base).toBeGreaterThan(0.1)
   })
 })
 
