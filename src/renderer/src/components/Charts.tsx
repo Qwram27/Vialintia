@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import type { NoteLevel, Settings } from '@shared/types'
 import { NOTE_LABELS, NOTE_ORDER } from '@shared/defaults'
-import { evolution, fmt, type RowCalc } from '@/lib/calc'
+import { EVO_SPLIT_H, evoAxis, evolution, fmt, type RowCalc } from '@/lib/calc'
 import { familyById } from '@/store/store'
 
 // ---------- Note structure ----------
@@ -136,8 +136,7 @@ export function EvolutionChart({ rows, settings }: { rows: RowCalc[]; settings: 
   const max = Math.max(1e-9, ...data.points.map((p) => p.top + p.heart + p.base))
   if (data.points[0].top + data.points[0].heart + data.points[0].base <= 0)
     return <div className="muted small">No data.</div>
-  const lnMax = Math.log(1 + data.tMax)
-  const x = (t: number) => padL + (Math.log(1 + t) / lnMax) * (W - padL * 2)
+  const x = (t: number) => padL + evoAxis(t) * (W - padL * 2)
   const yv = (v: number) => (H - padB) * (1 - v / max) + 2
   const stacks: NoteLevel[] = ['base', 'heart', 'top'] // base at the bottom
 
@@ -156,7 +155,7 @@ export function EvolutionChart({ rows, settings }: { rows: RowCalc[]; settings: 
     return { note, d, top: upper }
   })
 
-  const ticks = [0.25, 1, 4, 12, 24, 48].filter((t) => t <= data.tMax)
+  const ticks = [0.25, 1, 4, 12, 24, 48, 168]
   const end = data.points[data.points.length - 1]
   const endLeft = end.top + end.heart + end.base
   const hp = hi != null ? data.points[hi] : null
@@ -184,6 +183,8 @@ export function EvolutionChart({ rows, settings }: { rows: RowCalc[]; settings: 
         }}
         onPointerLeave={(e) => e.pointerType === 'mouse' && setHi(null)}
       >
+        {/* days 3–7, squeezed */}
+        <rect x={x(EVO_SPLIT_H)} y={0} width={x(data.tMax) - x(EVO_SPLIT_H)} height={H - padB} fill="rgba(255,255,255,.025)" />
         {ticks.map((t) => (
           <g key={t}>
             <line x1={x(t)} x2={x(t)} y1={0} y2={H - padB} stroke="var(--line-soft)" />
@@ -227,8 +228,8 @@ export function EvolutionChart({ rows, settings }: { rows: RowCalc[]; settings: 
         </div>
       )}
       <div className="row small faint" style={{ justifyContent: 'space-between', marginTop: 4 }}>
-        <span style={{ whiteSpace: 'nowrap' }} title="Estimated share of the concentrate still on the blotter after two days">
-          {fmtTime(data.tMax).toUpperCase()} · {endLeft > 0 ? `${fmt((endLeft / max) * 100, 0)}% LEFT` : 'GONE'}
+        <span style={{ whiteSpace: 'nowrap' }} title="Estimated share of the concentrate still on the blotter after a week">
+          {fmtTime(data.tMax).toUpperCase()} · {endLeft > 0 ? `${(endLeft / max) * 100 < 1 ? '<1' : fmt((endLeft / max) * 100, 0)}% LEFT` : 'GONE'}
         </span>
         <span className="row" style={{ gap: 10 }}>
           {(['top', 'heart', 'base'] as NoteLevel[]).map((n) => (

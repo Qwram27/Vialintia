@@ -342,13 +342,25 @@ export function computeFormula(
 
 /** Estimated evaporation profile: remaining neat mass per note over time (log time). */
 /**
- * Estimated evaporation on a blotter over the first two days (`tMax` h). Later on
- * only the base is left, so the curve stops there and shows what remains.
+ * Time axis of the evaporation chart: the first two days on a log scale take most
+ * of the width, the rest of the week is squeezed into a thin strip at the end.
  */
+export const EVO_SPLIT_H = 48
+export const EVO_END_H = 168
+const EVO_SPLIT_U = 0.85
+export function evoAxis(t: number): number {
+  if (t <= EVO_SPLIT_H) return (EVO_SPLIT_U * Math.log(1 + t)) / Math.log(1 + EVO_SPLIT_H)
+  return EVO_SPLIT_U + ((1 - EVO_SPLIT_U) * Math.min(t - EVO_SPLIT_H, EVO_END_H - EVO_SPLIT_H)) / (EVO_END_H - EVO_SPLIT_H)
+}
+export function evoAxisInv(u: number): number {
+  if (u <= EVO_SPLIT_U) return Math.exp((u / EVO_SPLIT_U) * Math.log(1 + EVO_SPLIT_H)) - 1
+  return EVO_SPLIT_H + ((u - EVO_SPLIT_U) / (1 - EVO_SPLIT_U)) * (EVO_END_H - EVO_SPLIT_H)
+}
+
+/** Estimated evaporation on a blotter over one week, sampled evenly along `evoAxis`. */
 export function evolution(
   rows: RowCalc[],
-  samples = 60,
-  tMax = 48
+  samples = 60
 ): { tMax: number; points: { t: number; top: number; heart: number; base: number }[] } {
   const items = rows
     .filter((r) => r.material && r.neatGrams > 0)
@@ -357,10 +369,9 @@ export function evolution(
       w: r.neatGrams,
       T: Math.max(0.1, r.material!.tenacityHours || DEFAULT_TENACITY[r.material!.note])
     }))
-  const lnMax = Math.log(1 + tMax)
   const points = []
   for (let i = 0; i <= samples; i++) {
-    const t = Math.exp((i / samples) * lnMax) - 1
+    const t = evoAxisInv(i / samples)
     const p = { t, top: 0, heart: 0, base: 0 }
     for (const it of items) {
       const rem = t >= it.T ? 0 : 1 - Math.log(1 + t) / Math.log(1 + it.T)
@@ -368,7 +379,7 @@ export function evolution(
     }
     points.push(p)
   }
-  return { tMax, points }
+  return { tMax: EVO_END_H, points }
 }
 
 export type DiffKind = 'added' | 'removed' | 'changed' | 'same'
