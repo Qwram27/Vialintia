@@ -36,7 +36,7 @@ export function FormulaEditor({ id }: { id: string }) {
   const redo = useStore((s) => s.redo)
   const materials = useMaterialMap()
   const accords = useAccordIndex()
-  const [tab, setTab] = useState<'composition' | 'pyramid' | 'notes' | 'details'>('composition')
+  const [tab, setTab] = useState<'composition' | 'notes' | 'details'>('composition')
   const mobile = useIsMobile()
 
   const version = formula ? currentVersion(formula) : null
@@ -95,7 +95,6 @@ export function FormulaEditor({ id }: { id: string }) {
               onChange={setTab}
               options={[
                 { value: 'composition', label: <>{mobile ? 'Formula' : 'Composition'}<span className="count">{String(version.rows.length).padStart(2, '0')}</span></> },
-                { value: 'pyramid', label: <>Pyramid<span className="count">{String(NOTE_ORDER.reduce((a, t) => a + (formula.pyramid?.[t]?.length ?? 0), 0)).padStart(2, '0')}</span></> },
                 { value: 'notes', label: <>{mobile ? 'Notes' : 'Test notes'}<span className="count">{String(formula.notes.length).padStart(2, '0')}</span></> },
                 { value: 'details', label: 'Details' }
               ]}
@@ -108,7 +107,6 @@ export function FormulaEditor({ id }: { id: string }) {
               ) : (
                 <Composition formula={formula} rows={version.rows} calc={calc} setRows={setRows} update={update} settings={settings} />
               ))}
-            {tab === 'pyramid' && <Pyramid formula={formula} update={update} />}
             {tab === 'notes' && <Notes formula={formula} update={update} />}
             {tab === 'details' && <Details formula={formula} update={update} />}
           </div>
@@ -1468,6 +1466,11 @@ function Notes({ formula, update }: { formula: Formula; update: (fn: (f: Formula
 
   return (
     <div>
+      <Pyramid formula={formula} update={update} />
+      <div className="notes-head">
+        <span className="label">Test notes</span>
+        <span className="faint small">{String(formula.notes.length).padStart(2, '0')}</span>
+      </div>
       <div className="card card-pad" style={{ background: 'var(--panel-2)', marginBottom: 16 }}>
         <div className="row mb" style={{ gap: 10, flexWrap: 'wrap' }}>
           <span className="label">New note for</span>

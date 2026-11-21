@@ -1087,7 +1087,11 @@ svg text { font-family: var(--mono); }
 /* ─────────────────────────────────────────────────────────────
    Note pyramid (formula → Pyramid tab)
    ───────────────────────────────────────────────────────────── */
-.pyr { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; align-items: start; padding-top: 4px; }
+.pyr-wrap { margin-bottom: 26px; }
+.pyr-head, .notes-head { display: flex; align-items: center; gap: 10px; padding: 6px 0 10px; }
+.notes-head { border-top: 1px solid var(--line-soft); padding-top: 18px; }
+.pyr { display: grid; grid-template-columns: minmax(0, 1fr); gap: 18px; align-items: start; }
+.pyr.picking { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
 .pyr-tiers { display: flex; flex-direction: column; gap: 10px; position: sticky; top: 0; }
 .pyr-tier { border: 1px solid var(--line); border-radius: var(--ctl, 7px); padding: 10px 12px 12px; background: rgba(255,255,255,.015); cursor: pointer; transition: border-color .2s; }
 .pyr-tier.active { border-color: rgba(255,255,255,.3); }
@@ -1130,11 +1134,12 @@ svg text { font-family: var(--mono); }
 .pyr-grid .ntile { width: auto; }
 
 @media (max-width: 1100px) {
-  .pyr { grid-template-columns: minmax(0, 1fr); }
+  .pyr, .pyr.picking { grid-template-columns: minmax(0, 1fr); }
   .pyr-tiers { position: static; }
 }
 @media (max-width: 700px) {
-  .pyr { gap: 16px; padding-top: 10px; }
+  .pyr { gap: 16px; }
+  .pyr-wrap { margin-top: 10px; }
   .pyr-tier { padding: 10px; }
   .pyr-tiles { gap: 6px; min-height: 78px; }
   .ntile { width: 76px; height: 78px; }
@@ -1157,12 +1162,15 @@ svg text { font-family: var(--mono); }
 }
 .stars button { color: rgba(255,255,255,.24); }
 .stars button.on { color: var(--text); }
-@media (max-width: 700px) {
-  /* four formula tabs fit the phone width only without the counters */
-  .pane-head .seg .count { display: none; }
-  .pane-head .seg-lg button { padding: 11px 4px; }
-}
 @media (hover: none) { .stars button:hover { transform: none; } }
 .pyr-addto { display: flex; align-items: center; gap: 12px; }
 .pyr-addto .seg { flex: 1; display: flex; }
 .pyr-addto .seg button { flex: 1; }
+
+/* user pictures on note tiles */
+.ntile.has-img { justify-content: flex-start; padding: 5px 5px 6px; gap: 5px; }
+.ntile-img { width: 100%; flex: 1; min-height: 0; object-fit: cover; border-radius: 4px; display: block; }
+.ntile.has-img .ntile-code { z-index: 1; background: rgba(0,0,0,.55); padding: 0 3px; border-radius: 2px; color: var(--text-2); top: 7px; left: 7px; }
+.ntile.has-img .ntile-mark { z-index: 1; background: rgba(0,0,0,.7); top: 7px; right: 7px; }
+.ntile.has-img .ntile-name { -webkit-line-clamp: 1; white-space: nowrap; text-overflow: ellipsis; display: block; }
+.pyr-actions { flex-wrap: wrap; }

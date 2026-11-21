@@ -1,15 +1,38 @@
-import { Fragment, useMemo, useState } from 'react'
+import { Fragment, useMemo, useRef, useState } from 'react'
 import type { Formula, NoteLevel, NotePyramid } from '@shared/types'
 import { NOTE_ORDER } from '@shared/defaults'
 import { NOTE_CATEGORIES, canonicalNote, noteCategory, noteSymbol } from '@/data/noteCatalog'
-import { confirmDialog } from '@/store/ui'
-import { IconX } from '@/components/Icons'
+import { confirmDialog, toast } from '@/store/ui'
+import { useStore } from '@/store/store'
+import { IconPlus, IconX } from '@/components/Icons'
 import { Seg } from '@/components/Seg'
 
 const TIER_LABEL: Record<NoteLevel, string> = { top: 'Top notes', heart: 'Heart notes', base: 'Base notes' }
 const TIER_MARK: Record<NoteLevel, string> = { top: 'T', heart: 'H', base: 'B' }
 const EMPTY: NotePyramid = { top: [], heart: [], base: [] }
 const key = (s: string) => s.trim().toLowerCase()
+
+/** Center-crop a picked picture to a small square JPEG (keeps the data file light). */
+async function toThumb(file: File, size = 200): Promise<string> {
+  // data: URL (the page's CSP allows data: images, not blob:)
+  const src = await new Promise<string>((res, rej) => {
+    const r = new FileReader()
+    r.onload = () => res(String(r.result))
+    r.onerror = () => rej(r.error)
+    r.readAsDataURL(file)
+  })
+  const img = new Image()
+  img.src = src
+  await img.decode()
+  const s = Math.min(img.naturalWidth, img.naturalHeight)
+  const c = document.createElement('canvas')
+  c.width = c.height = size
+  const ctx = c.getContext('2d')!
+  ctx.fillStyle = '#000'
+  ctx.fillRect(0, 0, size, size)
+  ctx.drawImage(img, (img.naturalWidth - s) / 2, (img.naturalHeight - s) / 2, s, s, 0, 0, size, size)
+  return c.toDataURL('image/jpeg', 0.82)
+}
 
 type Sel = { tier: NoteLevel; idx: number } | null
 type Drag = { name: string; from: NoteLevel | null } | null
@@ -23,6 +46,22 @@ export function Pyramid({ formula, update }: { formula: Formula; update: (fn: (f
   const [cat, setCat] = useState('all')
   const [drag, setDrag] = useState<Drag>(null)
   const [over, setOver] = useState<string | null>(null)
+  const [picking, setPicking] = useState(false)
+  const images = useStore((s) => s.settings.noteImages) ?? {}
+  const updateSettings = useStore((s) => s.updateSettings)
+  const fileRef = useRef<HTMLInputElement>(null)
+  const imgFor = useRef<string | null>(null)
+
+  const setImage = (name: string, url: string | null) => {
+    const next = { ...(useStore.getState().settings.noteImages ?? {}) }
+    if (url) next[key(name)] = url
+    else delete next[key(name)]
+    updateSettings({ noteImages: next })
+  }
+  const chooseImage = (name: string) => {
+    imgFor.current = name
+    fileRef.current?.click()
+  }
 
   const placed = useMemo(() => {
     const m = new Map<string, NoteLevel>()
@@ -104,11 +143,12 @@ export function Pyramid({ formula, update }: { formula: Formula; update: (fn: (f
   const tile = (name: string, opts: { tier?: NoteLevel; idx?: number; mark?: NoteLevel; on?: boolean; onClick: () => void }) => {
     const c = noteCategory(name)
     const id = opts.tier ? `${opts.tier}:${opts.idx}` : `cat:${name}`
+    const img = images[key(name)]
     return (
       <button
         key={id}
         type="button"
-        className={`ntile${opts.on ? ' on' : ''}${over === id ? ' drop' : ''}`}
+        className={`ntile${img ? ' has-img' : ''}${opts.on ? ' on' : ''}${over === id ? ' drop' : ''}`}
         title={`${name} · ${c.name}`}
         draggable
         onDragStart={(e) => {
@@ -143,14 +183,54 @@ export function Pyramid({ formula, update }: { formula: Formula; update: (fn: (f
       >
         <span className="ntile-code">{c.code}</span>
         {opts.mark && <span className="ntile-mark">{TIER_MARK[opts.mark]}</span>}
-        <span className="ntile-sym">{noteSymbol(name)}</span>
+        {img ? <img className="ntile-img" src={img} alt="" draggable={false} /> : <span className="ntile-sym">{noteSymbol(name)}</span>}
         <span className="ntile-name">{name}</span>
       </button>
     )
   }
 
   return (
-    <div className="pyr">
+    <div className="pyr-wrap">
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/*"
+        hidden
+        onChange={async (e) => {
+          const f = e.target.files?.[0]
+          e.target.value = ''
+          const name = imgFor.current
+          if (!f || !name) return
+          try {
+            setImage(name, await toThumb(f))
+            toast(`Picture set for ${name}`)
+          } catch {
+            toast('This picture could not be read')
+          }
+        }}
+      />
+      <div className="pyr-head">
+        <span className="label">Note pyramid</span>
+        <span className="faint small">{String(total).padStart(2, '0')}</span>
+        <div className="spacer" />
+        {picking && total > 0 && (
+          <button
+            className="btn btn-ghost btn-sm"
+            onClick={async () => {
+              if (await confirmDialog('Clear the pyramid?', 'All notes are taken out of top, heart and base.', 'Clear')) {
+                setP(() => ({ ...EMPTY }))
+                setSel(null)
+              }
+            }}
+          >
+            Clear
+          </button>
+        )}
+        <button className={`btn btn-sm${picking ? ' btn-primary' : ''}`} onClick={() => setPicking(!picking)}>
+          {picking ? 'Done' : <><IconPlus size={12} /> Pick notes</>}
+        </button>
+      </div>
+    <div className={`pyr${picking ? ' picking' : ''}`}>
       <div className="pyr-tiers">
         {NOTE_ORDER.map((t) => {
           const list = p[t] ?? []
@@ -179,7 +259,7 @@ export function Pyramid({ formula, update }: { formula: Formula; update: (fn: (f
                   </span>
                   <span className="faint">{String(list.length).padStart(2, '0')}</span>
                   <div className="spacer" />
-                  {active === t && <span className="pyr-hint">Adding here</span>}
+                  {picking && active === t && <span className="pyr-hint">Adding here</span>}
                 </div>
                 <div className="pyr-tiles">
                   {list.map((n, i) =>
@@ -193,7 +273,7 @@ export function Pyramid({ formula, update }: { formula: Formula; update: (fn: (f
                       }
                     })
                   )}
-                  {list.length === 0 && <div className="pyr-empty">Pick notes below{active === t ? '' : ' — tap to add here'}</div>}
+                  {list.length === 0 && <div className="pyr-empty">{picking ? (active === t ? 'Pick notes from the catalogue' : 'Tap to add notes here') : '—'}</div>}
                 </div>
                 {sel?.tier === t && selName && (
                   <div className="pyr-actions" onClick={(e) => e.stopPropagation()}>
@@ -203,7 +283,21 @@ export function Pyramid({ formula, update }: { formula: Formula; update: (fn: (f
                     <button className="btn btn-sm" title="Move right" disabled={sel.idx >= list.length - 1} onClick={() => shift(1)}>→</button>
                     <button className="btn btn-sm" title="Up a tier" disabled={t === 'top'} onClick={() => toTier(-1)}>↑</button>
                     <button className="btn btn-sm" title="Down a tier" disabled={t === 'base'} onClick={() => toTier(1)}>↓</button>
-                    <button className="btn btn-sm btn-icon" title="Remove" onClick={() => remove(selName)}>
+                    <button className="btn btn-sm" title="Add or change the picture of this note (used in every formula)" onClick={() => chooseImage(selName)}>
+                      {images[key(selName)] ? 'Image' : <><IconPlus size={12} /> Image</>}
+                    </button>
+                    {images[key(selName)] && (
+                      <button
+                        className="btn btn-sm"
+                        title="Remove the picture (back to the symbol tile)"
+                        onClick={async () => {
+                          if (await confirmDialog('Remove picture?', `${selName} goes back to its symbol tile in every formula.`, 'Remove')) setImage(selName, null)
+                        }}
+                      >
+                        No image
+                      </button>
+                    )}
+                    <button className="btn btn-sm btn-icon" title="Remove from the pyramid" onClick={() => remove(selName)}>
                       <IconX size={14} />
                     </button>
                   </div>
@@ -212,23 +306,9 @@ export function Pyramid({ formula, update }: { formula: Formula; update: (fn: (f
             </Fragment>
           )
         })}
-        {total > 0 && (
-          <div className="row" style={{ justifyContent: 'flex-end' }}>
-            <button
-              className="btn btn-ghost btn-sm"
-              onClick={async () => {
-                if (await confirmDialog('Clear the pyramid?', 'All notes are taken out of top, heart and base.', 'Clear')) {
-                  setP(() => ({ ...EMPTY }))
-                  setSel(null)
-                }
-              }}
-            >
-              Clear pyramid
-            </button>
-          </div>
-        )}
       </div>
 
+      {picking && (
       <div className="pyr-cat">
         <div className="pyr-cat-head">
           <div className="pyr-addto">
@@ -308,6 +388,8 @@ export function Pyramid({ formula, update }: { formula: Formula; update: (fn: (f
         ))}
         {q && groups.length === 0 && <div className="faint small" style={{ padding: '4px 2px' }}>No catalogue note matches — add it as your own.</div>}
       </div>
+      )}
+    </div>
     </div>
   )
 }
