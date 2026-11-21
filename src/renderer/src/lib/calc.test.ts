@@ -59,9 +59,9 @@ describe('computeFormula', () => {
     expect(c.solventGrams).toBeCloseTo(0.9)
     expect(c.rows[1].weighedPct).toBeCloseTo(10)
     expect(c.rows[1].neatPct).toBeCloseTo(1)
-    expect(c.rows[1].productPct).toBeCloseTo(0.2) // 1% in concentrate × 20% EdP
-    expect(c.ifra.byMaterial.get('b')!.status).toBe('near') // exactly at the limit
-    expect(c.ifra.maxConcentration).toBeCloseTo(20)
+    expect(c.rows[1].productPct).toBeCloseTo(0.2 / 0.91) // 20% EdP = neat aroma; concentrate is 91% neat
+    expect(c.ifra.byMaterial.get('b')!.status).toBe('over') // dilution solvent means more concentrate, so B goes over
+    expect(c.ifra.maxConcentration).toBeCloseTo(18.2)
     // cost: A 9g*100/kg = 0.9 ; B neat 0.1g*1000/kg = 0.1
     expect(c.cost).toBeCloseTo(1.0)
     expect(c.costPerKg).toBeCloseTo(100)
@@ -101,9 +101,9 @@ describe('computeFormula', () => {
     expect(c.batch.costPerBottle).toBeCloseTo((16.4 * 100) / 1000 / 2)
   })
 
-  it('scales to a concentrate mass', () => {
+  it('scales to a total product weight', () => {
     const c = computeFormula(
-      formula({ batch: { mode: 'mass', bottles: 0, bottleMl: 0, massG: 100 } }),
+      formula({ batch: { mode: 'mass', bottles: 0, bottleMl: 0, massG: 500 } }),
       [
         { id: '1', materialId: 'a', amount: 3, dilution: 100 },
         { id: '2', materialId: 'b', amount: 1, dilution: 100 }
@@ -358,7 +358,7 @@ import { csvToFormula } from './importFormula'
 describe('formula CSV import', () => {
   it('reads the formula CSV format written by the app', () => {
     const csv = [
-      'Material,CAS,Family,Note,Amount (g),Dilution %,Solvent,Weighed %,Neat % in concentrate,% in product,IFRA limit %,Batch (g)',
+      'Material,CAS,Family,Note,Amount (g),Dilution %,Solvent,Weighed %,Active %,IFRA limit %,Batch (g)',
       'Hedione,24851-98-7,Floral,Heart,10,100,,83.3,83.3,14.2,,5.8',
       'Citral,5392-40-5,Citrus,Top,2,10,EtOH,16.7,1.6,0.28,0.6,1.1',
       '',

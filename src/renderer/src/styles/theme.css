@@ -1174,3 +1174,16 @@ svg text { font-family: var(--mono); }
 .ntile.has-img .ntile-mark { z-index: 1; background: rgba(0,0,0,.7); top: 7px; right: 7px; }
 .ntile.has-img .ntile-name { -webkit-line-clamp: 1; white-space: nowrap; text-overflow: ellipsis; display: block; }
 .pyr-actions { flex-wrap: wrap; }
+/* Analyze summary tiles */
+.cmp-summary { display: grid; grid-template-columns: 1.6fr repeat(4, 1fr); gap: 10px; margin-bottom: 16px; }
+.cmp-tile { display: flex; flex-direction: column; gap: 6px; padding: 16px 18px; }
+.cmp-tile .v { font-size: 30px; font-weight: 200; line-height: 1; letter-spacing: -0.05em; font-variant-numeric: tabular-nums; }
+.cmp-tile .k { font-size: 9.5px; letter-spacing: .22em; text-transform: uppercase; color: var(--text-2); }
+.cmp-tile small { font-size: 10px; color: var(--faint); }
+.cmp-tile-main .v { font-size: 40px; }
+@media (max-width: 700px) {
+  .cmp-summary { grid-template-columns: repeat(4, 1fr); }
+  .cmp-tile-main { grid-column: 1 / -1; }
+  .cmp-tile { padding: 12px; }
+  .cmp-tile .v { font-size: 22px; }
+}

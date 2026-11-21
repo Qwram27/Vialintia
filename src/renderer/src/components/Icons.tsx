@@ -67,11 +67,12 @@ function NavBase({ size = 18, children, ...rest }: P & { children: React.ReactNo
 export const IconSheet = (p: P) => (
   <NavBase {...p}><path d="M5.5 3h9l4 4v14h-13z" /><path d="M14.5 3v4h4" /><path d="M8.5 11h7M8.5 14h7M8.5 17h4" /></NavBase>
 )
-/** Materials — a heap of powder (outline, grains inside and spilling out). */
+/** Materials — a disposable plastic pipette, tilted, tip to the lower left. */
 export const IconPowder = (p: P) => (
-  <NavBase {...p} strokeLinejoin="round">
-    <path d="M3.00 15.15 L10.45 6.11 Q11.92 4.90 13.40 6.11 L20.85 15.15 Q22.08 16.42 20.85 17.58 Q11.92 19.40 3.00 17.58 Q1.77 16.42 3.00 15.15 Z" />
-    <path fill="currentColor" stroke="none" d="M6.59 12.33a0.62 0.62 0 1 0 1.24 0a0.62 0.62 0 1 0 -1.24 0 M8.78 13.15a0.62 0.62 0 1 0 1.24 0a0.62 0.62 0 1 0 -1.24 0 M4.90 14.91a0.62 0.62 0 1 0 1.24 0a0.62 0.62 0 1 0 -1.24 0 M7.09 14.57a0.62 0.62 0 1 0 1.24 0a0.62 0.62 0 1 0 -1.24 0 M9.95 15.03a0.62 0.62 0 1 0 1.24 0a0.62 0.62 0 1 0 -1.24 0 M3.61 16.24a0.62 0.62 0 1 0 1.24 0a0.62 0.62 0 1 0 -1.24 0 M5.58 16.85a0.62 0.62 0 1 0 1.24 0a0.62 0.62 0 1 0 -1.24 0 M7.67 16.48a0.62 0.62 0 1 0 1.24 0a0.62 0.62 0 1 0 -1.24 0 M17.21 14.66a0.62 0.62 0 1 0 1.24 0a0.62 0.62 0 1 0 -1.24 0 M16.38 16.18a0.62 0.62 0 1 0 1.24 0a0.62 0.62 0 1 0 -1.24 0 M18.47 16.09a0.62 0.62 0 1 0 1.24 0a0.62 0.62 0 1 0 -1.24 0 M17.21 20.09a0.62 0.62 0 1 0 1.24 0a0.62 0.62 0 1 0 -1.24 0 M19.15 19.91a0.62 0.62 0 1 0 1.24 0a0.62 0.62 0 1 0 -1.24 0 M15.80 21.12a0.62 0.62 0 1 0 1.24 0a0.62 0.62 0 1 0 -1.24 0 M18.23 21.22a0.62 0.62 0 1 0 1.24 0a0.62 0.62 0 1 0 -1.24 0" />
+  <NavBase {...p}>
+    <g transform="rotate(45 12 12)">
+      <path d="M11.3 10.4 L10.2 8.8 V3.4 Q10.2 2 12 2 Q13.8 2 13.8 3.4 V8.8 L12.7 10.4 V19.6 L12 22.2 L11.3 19.6 Z" />
+    </g>
   </NavBase>
 )
 /** Analyze — a plotted curve on axes. */

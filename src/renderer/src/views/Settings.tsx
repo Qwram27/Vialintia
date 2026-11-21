@@ -338,7 +338,7 @@ export function SettingsView() {
             <div className="muted small" style={{ lineHeight: 1.7 }}>
               Vialintia {APP_VERSION} — fine fragrance formulation archive.
               <br />
-              Percentages: <b>Weighed %</b> is the share of what you put on the scale; <b>In product %</b> is the neat material in the finished
+              Percentages: <b>Weighed %</b> is the share of what you put on the scale; <b>Active %</b> is the neat material in the concentrate (dilution removed); IFRA still checks the neat material in the finished
               perfume after dilution and the chosen concentration — the figure IFRA limits apply to.
             </div>
           </div>
