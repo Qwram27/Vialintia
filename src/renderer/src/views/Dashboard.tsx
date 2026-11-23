@@ -8,12 +8,11 @@ import { concLabel, seasonCode, shortDate } from '@/lib/archive'
 import { PRODUCT_PRESETS } from '@shared/defaults'
 import { NoteBar } from '@/components/Charts'
 import { Seg } from '@/components/Seg'
+import { useLongPress } from '@/lib/useLongPress'
 import { IconCopy, IconPlus, IconSearch, IconTrash, IconUpload } from '@/components/Icons'
 
 const STATUS_LABEL: Record<FormulaStatus, string> = { testing: 'Testing', final: 'Final' }
 const ALL = '\u0000all'
-const ACCORDS = '\u0000accords'
-const ACCORDS_LABEL = 'Accords'
 
 export function Dashboard() {
   const formulas = useStore((s) => s.formulas)
@@ -26,10 +25,7 @@ export function Dashboard() {
   const accords = useAccordIndex()
   const [q, setQ] = useState('')
   const [status, setStatus] = useState<FormulaStatus | 'all'>('all')
-  const allMaterials = useStore((s) => s.materials)
   const updateSettings = useStore((s) => s.updateSettings)
-  /** Formulas saved to Materials as an accord — shown together in the automatic Accords folder. */
-  const accordIds = useMemo(() => new Set(allMaterials.map((m) => m.accordFormulaId).filter(Boolean) as string[]), [allMaterials])
   const folders = useMemo(() => {
     const list = [...(settings.folders ?? [])]
     for (const f of formulas) if (f.folder && !list.includes(f.folder)) list.push(f.folder)
@@ -50,15 +46,15 @@ export function Dashboard() {
       /* ignore */
     }
   }
-  const activeFolder = folder === ALL || folder === ACCORDS || folders.includes(folder) ? folder : ALL
-  const inFolder = (f: Formula, fo: string) => (fo === ALL ? true : fo === ACCORDS ? accordIds.has(f.id) : f.folder === fo)
+  const activeFolder = folder === ALL || folders.includes(folder) ? folder : ALL
+  const inFolder = (f: Formula, fo: string) => (fo === ALL ? true : f.folder === fo)
   const [naming, setNaming] = useState<{ from: string | null; text: string } | null>(null)
   const commitName = () => {
     if (!naming) return
     const name = naming.text.trim()
     setNaming(null)
     if (!name || name === naming.from) return
-    if (name === ACCORDS_LABEL || folders.includes(name)) return toast('A folder with that name already exists')
+    if (folders.includes(name)) return toast('A folder with that name already exists')
     if (naming.from == null) {
       updateSettings({ folders: [...folders, name] })
     } else {
@@ -116,7 +112,7 @@ export function Dashboard() {
         return { f, v, no: concLabel(f), calc: computeFormula(f, v.rows, materials, settings, accords) }
       })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [formulas, materials, settings, accords, q, status, sort, activeFolder, accordIds])
+  }, [formulas, materials, settings, accords, q, status, sort, activeFolder])
 
   const remove = async (f: Formula) => {
     if (await confirmDialog('Delete formula', `“${f.name}” and all its versions and notes will be removed.`)) {
@@ -124,7 +120,8 @@ export function Dashboard() {
       toast('Formula deleted')
     }
   }
-  const cardMenu = (e: React.MouseEvent, f: Formula) =>
+  const press = useLongPress()
+  const cardMenu = (e: { clientX: number; clientY: number; preventDefault(): void; stopPropagation(): void }, f: Formula) =>
     openContextMenu(e, [
       { label: 'Open', onSelect: () => navigate(`/formula/${f.id}`) },
       { label: 'Assemble fragrance', onSelect: () => navigate(`/formula/${f.id}/assemble`) },
@@ -135,15 +132,25 @@ export function Dashboard() {
           toast(`Duplicated ${f.name}`)
         }
       },
-      ...folders
-        .filter((x) => x !== f.folder)
-        .map((x, i) => ({ label: `Move to ${x}`, sep: i === 0, onSelect: () => updateFormula(f.id, (y) => ({ ...y, folder: x })) })),
-      ...(f.folder ? [{ label: `Remove from ${f.folder}`, sep: !folders.some((x) => x !== f.folder), onSelect: () => updateFormula(f.id, (y) => ({ ...y, folder: undefined })) }] : []),
-      {
-        label: f.status === 'final' ? 'Mark as testing' : 'Mark as final',
-        sep: true,
-        onSelect: () => updateFormula(f.id, (x) => ({ ...x, status: x.status === 'final' ? 'testing' : 'final' }))
-      },
+      // only one place it can go → a direct item; otherwise a second menu with the folders
+      ...(() => {
+        const others = folders.filter((x) => x !== f.folder)
+        const setFolder = (x: string | undefined) => () => updateFormula(f.id, (y) => ({ ...y, folder: x }))
+        if (!f.folder && others.length === 1) return [{ label: `Move to ${others[0]}`, sep: true, onSelect: setFolder(others[0]) }]
+        if (f.folder && others.length === 0) return [{ label: `Remove from ${f.folder}`, sep: true, onSelect: setFolder(undefined) }]
+        if (!f.folder && others.length === 0) return []
+        return [
+          {
+            label: f.folder ? `Folder: ${f.folder}…` : 'Move to folder…',
+            sep: true,
+            onSelect: () =>
+              openContextMenu({ clientX: e.clientX, clientY: e.clientY, preventDefault() {}, stopPropagation() {} }, [
+                ...folders.map((x) => ({ label: x === f.folder ? `✓ ${x}` : x, disabled: x === f.folder, onSelect: setFolder(x) })),
+                f.folder ? { label: 'No folder', sep: true, onSelect: setFolder(undefined) } : null
+              ])
+          }
+        ]
+      })(),
       { label: 'Delete', danger: true, sep: true, onSelect: () => remove(f) }
     ])
 
@@ -153,7 +160,7 @@ export function Dashboard() {
     inF.forEach((f) => c[f.status]++)
     return c
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [formulas, activeFolder, accordIds])
+  }, [formulas, activeFolder])
 
   const importData = useStore((s) => s.importData)
   const settingsAll = useStore((s) => s.settings)
@@ -220,7 +227,6 @@ export function Dashboard() {
           <div className="folder-bar">
             {[
               { id: ALL, label: 'All' },
-              ...(accordIds.size ? [{ id: ACCORDS, label: ACCORDS_LABEL }] : []),
               ...folders.map((x) => ({ id: x, label: x }))
             ].map((x) =>
               naming && naming.from === x.id ? null : (
@@ -248,7 +254,7 @@ export function Dashboard() {
                 <IconPlus size={12} /> Folder
               </button>
             )}
-            {activeFolder !== ALL && activeFolder !== ACCORDS && !naming && (
+            {activeFolder !== ALL && !naming && (
               <span className="folder-tools">
                 <button className="btn btn-ghost btn-sm" onClick={() => setNaming({ from: activeFolder, text: activeFolder })}>
                   Rename
@@ -259,10 +265,6 @@ export function Dashboard() {
               </span>
             )}
           </div>
-          {activeFolder === ACCORDS && <p className="faint small folder-note">Formulas saved to Materials as an accord (Save as accord in the formula).</p>}
-          {activeFolder !== ALL && activeFolder !== ACCORDS && list.length === 0 && !q && (
-            <p className="faint small folder-note">Empty folder — move formulas here with a right-click on a card, or set the folder in the formula (Details).</p>
-          )}
 
           <div className="toolbar">
             <div className="search" style={{ width: 300 }}>
@@ -323,7 +325,7 @@ export function Dashboard() {
                 </thead>
                 <tbody>
                   {list.map(({ f, v, no, calc }, i) => (
-                    <tr key={f.id} style={{ '--i': i } as React.CSSProperties} onClick={() => navigate(`/formula/${f.id}`)} onContextMenu={(e) => cardMenu(e, f)}>
+                    <tr key={f.id} style={{ '--i': i } as React.CSSProperties} onClick={() => navigate(`/formula/${f.id}`)} onContextMenu={(e) => cardMenu(e, f)} {...press((p) => cardMenu(p, f))}>
                       <td className="l idx-no">{no}</td>
                       <td className="l idx-name">{f.name}</td>
                       <td className="l">
@@ -355,7 +357,7 @@ export function Dashboard() {
           ) : (
           <div className="formula-grid">
             {list.map(({ f, v, no, calc }, i) => (
-              <div key={f.id} className="card fcard" style={{ '--i': i } as React.CSSProperties} onClick={() => navigate(`/formula/${f.id}`)} onContextMenu={(e) => cardMenu(e, f)}>
+              <div key={f.id} className="card fcard" style={{ '--i': i } as React.CSSProperties} onClick={() => navigate(`/formula/${f.id}`)} onContextMenu={(e) => cardMenu(e, f)} {...press((p) => cardMenu(p, f))}>
                 <div className="fcard-actions" onClick={(e) => e.stopPropagation()}>
                   <button
                     className="btn btn-ghost btn-icon"
