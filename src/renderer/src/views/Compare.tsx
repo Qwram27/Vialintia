@@ -235,7 +235,7 @@ export function Compare({ a, b }: { a?: string; b?: string }) {
                 <span className="xy">
                   <span className="xv">{fmtPct(grp.a)}</span>
                   <span className="ar">→</span>
-                  <span className="xv">{fmtPct(grp.b)}</span>
+                  <span className="xv yv">{fmtPct(grp.b)}</span>
                 </span>
                 <span className={`d ${deltaCls(grp.b - grp.a)}`}>{pts(grp.b - grp.a)}</span>
               </div>
@@ -251,7 +251,7 @@ export function Compare({ a, b }: { a?: string; b?: string }) {
                     <span className="xy">
                       {d.a == null ? <span className="xv none">—</span> : <span className="xv">{fmtPct(d.a)}</span>}
                       <span className="ar">→</span>
-                      {d.b == null ? <span className="xv none">—</span> : <span className="xv">{fmtPct(d.b)}</span>}
+                      {d.b == null ? <span className="xv none">—</span> : <span className="xv yv">{fmtPct(d.b)}</span>}
                     </span>
                     <span className={`d ${deltaCls(d.delta, d.kind === 'same')}`}>{changeLabel(d)}</span>
                   </div>

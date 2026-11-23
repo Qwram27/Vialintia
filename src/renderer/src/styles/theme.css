@@ -1246,6 +1246,9 @@ img, svg { -webkit-user-drag: none; }
 .btn svg { flex: none; }
 
 /* X → Y in fixed slots: numbers right-aligned, a missing side's dash centred, arrows in one column */
-.cmp-li .xy { display: inline-grid; grid-template-columns: 44px 14px 44px; align-items: center; justify-items: end; }
+.cmp-li .xy { display: inline-grid; grid-template-columns: 44px 18px 44px; align-items: center; justify-items: end; }
 .cmp-li .xy .ar { justify-self: center; color: var(--faint); }
 .cmp-li .xy .none { justify-self: center; color: var(--faint); }
+/* Y hugs the arrow from the right, X from the left: the arrow sits midway between the numbers */
+.cmp-li .xy .yv { justify-self: start; }
+.cmp-li .xy .ar { text-align: center; }
