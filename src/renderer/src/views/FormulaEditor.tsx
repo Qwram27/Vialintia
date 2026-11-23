@@ -13,7 +13,7 @@ import { MaterialPicker } from '@/components/MaterialPicker'
 import { IfraBadge, statusColor } from '@/components/Ifra'
 import { EvolutionChart, FamilyDonut, StructureChart } from '@/components/Charts'
 import { Seg } from '@/components/Seg'
-import { catalogNo, seasonCode, shortDate } from '@/lib/archive'
+import { catalogNo, concLabel, seasonCode, shortDate } from '@/lib/archive'
 import { Stars } from '@/components/Overlays'
 import { Sheet } from '@/components/Sheet'
 import { Pyramid } from '@/views/Pyramid'
@@ -326,7 +326,7 @@ function Header({
     <div className="editor-head">
       <div style={{ flex: 1, minWidth: 0 }}>
         <div className="page-kicker">
-          N°{catalogNo(formula, all)} · {seasonCode(formula.createdAt)} · {versionLabel} · {shortDate(formula.createdAt)}
+          {concLabel(formula)} · {seasonCode(formula.createdAt)} · {versionLabel} · {shortDate(formula.createdAt)}
         </div>
         <input
           className="title-input"
@@ -1194,8 +1194,9 @@ function Inspector({
                 max={100}
                 onCommit={(v) => {
                   const c = v ?? 0
+                  // the chosen type stays (an EDT at 12 % is still an EDT); Author only picks up a preset value
                   const match = Object.entries(PRODUCT_PRESETS).find(([, p]) => p.concentration === c)?.[0] as ProductType | undefined
-                  update((f) => ({ ...f, concentration: c, productType: match ?? 'custom' }))
+                  update((f) => ({ ...f, concentration: c, productType: f.productType === 'custom' && match ? match : f.productType }))
                 }}
               />
               <span>%</span>

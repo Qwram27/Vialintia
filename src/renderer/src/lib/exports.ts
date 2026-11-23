@@ -121,7 +121,7 @@ export function formulaToPdfHtml(formula: Formula, versionLabel: string, calc: F
       'Batch',
       formula.batch.mode === 'bottles'
         ? `${formula.batch.bottles} × ${fmtSmart(formula.batch.bottleMl)} ml (${fmt(b.productMl, 1)} ml)`
-        : `${fmt(b.concentrateG, 2)} g concentrate`
+        : `${fmt(b.productG, 2)} g product`
     ],
     ['Concentrate', `${fmt(b.concentrateG, 2)} g`],
     ['Alcohol', `${fmt(b.alcoholG, 2)} g  /  ${fmt(b.alcoholMl, 1)} ml`],
@@ -137,6 +137,7 @@ export function formulaToPdfHtml(formula: Formula, versionLabel: string, calc: F
     .join('')
 
   const structure = NOTE_ORDER.map((n) => `${NOTE_LABELS[n]} ${noteTotal > 0 ? fmt((calc.byNote[n] / noteTotal) * 100, 1) : '–'} %`).join('   ·   ')
+  const diluted = calc.rows.some((r) => r.material && r.row.dilution < 100)
   const pyramid = NOTE_ORDER.filter((n) => formula.pyramid?.[n]?.length).map((n) => `${NOTE_LABELS[n]}: ${formula.pyramid![n].map(esc).join(', ')}`).join('   ·   ')
 
   return `<!doctype html><html><head><meta charset="utf-8"><title>${esc(formula.name)}</title>
@@ -172,6 +173,7 @@ export function formulaToPdfHtml(formula: Formula, versionLabel: string, calc: F
   .comp td.c { white-space: nowrap; }
   .summary { margin-top: 10px; font-size: 8.5pt; line-height: 1.6; }
   .warn { margin-top: 8px; border: 1.5px solid #000; padding: 6px 8px; font-size: 8.5pt; }
+  .dil { font-size: 8.5pt; border: 1px solid #000; padding: 5px 8px; margin-top: 8px; }
   .notes { border: 1px solid #999; min-height: 80px; padding: 6px 8px; font-size: 8.5pt; white-space: pre-wrap; }
   .sign { display: flex; gap: 30px; margin-top: 26px; font-size: 8.5pt; }
   .sign div { flex: 1; border-top: 1px solid #000; padding-top: 4px; color: #444; }
@@ -225,6 +227,7 @@ export function formulaToPdfHtml(formula: Formula, versionLabel: string, calc: F
           : 'all materials within entered limits'
     }${calc.ifra.maxConcentration != null ? ` · max. concentration ${fmt(calc.ifra.maxConcentration, 2)} %` : ''}
   </div>
+  ${diluted ? `<div class="dil"><b>Dilutions included:</b> diluted rows are weighed as their solutions (Batch g column). Their solvent is counted, so the concentrate weighs more and the alcohol is reduced accordingly — the product holds ${fmt(formula.concentration, 1)} % neat aroma.</div>` : ''}
   ${over.length ? `<div class="warn"><b>! Above IFRA limit:</b> ${over.map((e) => `${esc(e.material.name)} – ${fmtSmart(e.productPct)} % in product (limit ${fmtSmart(e.limit)} %)`).join('; ')}</div>` : ''}
 
   <h2>Notes</h2>

@@ -4,14 +4,13 @@ import { currentVersion, familyById, useAccordIndex, useMaterialMap, useStore } 
 import { confirmDialog, navigate, toast } from '@/store/ui'
 import { computeFormula, fmt, fmtSmart, roundToStep } from '@/lib/calc'
 import { uid } from '@/lib/id'
-import { catalogNo } from '@/lib/archive'
+import { concLabel } from '@/lib/archive'
 import { NumberInput } from '@/components/NumberInput'
 import { IconCheck, IconChevronLeft } from '@/components/Icons'
 
 /** Weighing session: ingredient by ingredient, target vs. actually weighed, running scale reading. */
 export function Assemble({ id }: { id: string }) {
   const formula = useStore((s) => s.formulas.find((f) => f.id === id))
-  const all = useStore((s) => s.formulas)
   const settings = useStore((s) => s.settings)
   const updateFormula = useStore((s) => s.updateFormula)
   const materials = useMaterialMap()
@@ -70,7 +69,7 @@ export function Assemble({ id }: { id: string }) {
     <div className="page-head">
       <div>
         <div className="page-kicker">
-          N°{catalogNo(formula, all)} · {labels.get(draft?.versionId ?? version.id)} · Assemble
+          {concLabel(formula)} · {labels.get(draft?.versionId ?? version.id)} · Assemble
         </div>
         <h1 className="page-title">{formula.name}</h1>
         <div className="page-sub">
@@ -95,7 +94,7 @@ export function Assemble({ id }: { id: string }) {
           <div className="stat-row"><span className="k">Version</span><span className="v">{version.label}</span></div>
           <div className="stat-row">
             <span className="k">Batch</span>
-            <span className="v">{formula.batch.mode === 'bottles' ? `${formula.batch.bottles} × ${fmtSmart(formula.batch.bottleMl)} ml` : `${fmt(b.concentrateG, 2)} g concentrate`}</span>
+            <span className="v">{formula.batch.mode === 'bottles' ? `${formula.batch.bottles} × ${fmtSmart(formula.batch.bottleMl)} ml` : `${fmt(b.productG, 2)} g product`}</span>
           </div>
           {drops ? (
             <div className="stat-row">
@@ -107,6 +106,12 @@ export function Assemble({ id }: { id: string }) {
           )}
           <div className="stat-row"><span className="k">Then alcohol</span><span className="v">{show(r(b.alcoholG))} g · {fmt(b.alcoholMl, 1)} ml</span></div>
           <div className="stat-row"><span className="k">Ingredients</span><span className="v">{calc.rows.filter((x) => x.material && x.batchGrams > 0).length}</span></div>
+          {calc.rows.some((x) => x.material && x.batchGrams > 0 && x.row.dilution < 100) && (
+            <p className="faint small">
+              Dilutions are already counted: diluted rows are weighed as their solutions, so more concentrate is weighed and the alcohol is reduced by
+              the solvent they bring — the product still ends up at {concLabel(formula)} neat aroma.
+            </p>
+          )}
           <p className="faint small">Change the batch size in the formula (Setup → Batch) before you start.</p>
           <button className="btn btn-primary mt" disabled={!(b.concentrateG > 0) || calc.rows.length === 0} onClick={start}>
             Start assembling
