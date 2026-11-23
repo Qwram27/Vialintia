@@ -9,11 +9,11 @@ import { useIsMobile } from '@/lib/useMobile'
 
 const KIND_LABEL: Record<DiffKind, string> = { added: 'Added', removed: 'Removed', changed: 'Changed', same: '' }
 const VOLATILITY: Record<NoteLevel, string> = { top: 'most volatile', heart: 'middle', base: 'most tenacious' }
-/** Change in percentage points of the concentrate: +17.14, −0.035. */
+/** Change of the share (Y − X, percentage points of the concentrate) shown as %: +17.14%, −0.035%. */
 const pts = (v: number) => {
   const a = Math.abs(v)
   if (a < 0.0005) return '·'
-  return `${v > 0 ? '+' : '−'}${fmt(a, a >= 0.1 ? 2 : 3)}`
+  return `${v > 0 ? '+' : '−'}${fmt(a, a >= 0.1 ? 2 : 3)}%`
 }
 const deltaCls = (v: number, same = false) => (same || Math.abs(v) < 0.0005 ? 'dim' : v > 0 ? 'delta-up' : 'delta-down')
 const changeLabel = (d: DiffRow) => (d.kind === 'added' ? 'new' : d.kind === 'removed' ? 'gone' : d.kind === 'same' ? '·' : pts(d.delta))
@@ -118,7 +118,7 @@ export function Compare({ a, b }: { a?: string; b?: string }) {
         <div>
           <div className="page-kicker">Versions · Side by side</div>
           <h1 className="page-title">Analyze</h1>
-          <div className="page-sub">Neat share of the concentrate · change in percentage points (Y − X) · {changes} difference{changes === 1 ? '' : 's'}</div>
+          <div className="page-sub">Neat share of the concentrate · change = Y − X · {changes} difference{changes === 1 ? '' : 's'}</div>
         </div>
       </div>
 
@@ -226,7 +226,7 @@ export function Compare({ a, b }: { a?: string; b?: string }) {
           <div className="cmp-list-head">
             <span>Material</span>
             <span>X → Y %</span>
-            <span>Δ pts</span>
+            <span>Change</span>
           </div>
           {groups.map((grp) => (
             <Fragment key={grp.g}>
@@ -271,7 +271,7 @@ export function Compare({ a, b }: { a?: string; b?: string }) {
               <th title="Tenacity on a blotter (TGSC substantivity) — fastest first within each group">Life h</th>
               <th>X %</th>
               <th>Y %</th>
-              <th title="Y − X in percentage points of the concentrate">Δ pts</th>
+              <th title="Y − X: how much the share of the concentrate went up or down">Change</th>
               <th className="l" style={{ width: 110 }} />
             </tr>
           </thead>
