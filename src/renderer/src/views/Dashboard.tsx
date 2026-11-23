@@ -132,21 +132,25 @@ export function Dashboard() {
           toast(`Duplicated ${f.name}`)
         }
       },
-      {
-        label: f.folder ? `Folder: ${f.folder}…` : 'Move to folder…',
-        sep: true,
-        // second menu at the same spot: the folders, the current one ticked
-        onSelect: () =>
-          openContextMenu({ clientX: e.clientX, clientY: e.clientY, preventDefault() {}, stopPropagation() {} }, [
-            ...folders.map((x) => ({
-              label: x === f.folder ? `✓ ${x}` : x,
-              disabled: x === f.folder,
-              onSelect: () => updateFormula(f.id, (y) => ({ ...y, folder: x }))
-            })),
-            f.folder ? { label: 'No folder', sep: folders.length > 0, onSelect: () => updateFormula(f.id, (y) => ({ ...y, folder: undefined })) } : null,
-            folders.length === 0 ? { label: 'No folders yet — add one with + Folder', disabled: true, onSelect: () => {} } : null
-          ])
-      },
+      // only one place it can go → a direct item; otherwise a second menu with the folders
+      ...(() => {
+        const others = folders.filter((x) => x !== f.folder)
+        const setFolder = (x: string | undefined) => () => updateFormula(f.id, (y) => ({ ...y, folder: x }))
+        if (!f.folder && others.length === 1) return [{ label: `Move to ${others[0]}`, sep: true, onSelect: setFolder(others[0]) }]
+        if (f.folder && others.length === 0) return [{ label: `Remove from ${f.folder}`, sep: true, onSelect: setFolder(undefined) }]
+        if (!f.folder && others.length === 0) return []
+        return [
+          {
+            label: f.folder ? `Folder: ${f.folder}…` : 'Move to folder…',
+            sep: true,
+            onSelect: () =>
+              openContextMenu({ clientX: e.clientX, clientY: e.clientY, preventDefault() {}, stopPropagation() {} }, [
+                ...folders.map((x) => ({ label: x === f.folder ? `✓ ${x}` : x, disabled: x === f.folder, onSelect: setFolder(x) })),
+                f.folder ? { label: 'No folder', sep: true, onSelect: setFolder(undefined) } : null
+              ])
+          }
+        ]
+      })(),
       { label: 'Delete', danger: true, sep: true, onSelect: () => remove(f) }
     ])
 
