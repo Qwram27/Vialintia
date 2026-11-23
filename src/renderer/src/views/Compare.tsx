@@ -118,7 +118,7 @@ export function Compare({ a, b }: { a?: string; b?: string }) {
         <div>
           <div className="page-kicker">Versions · Side by side</div>
           <h1 className="page-title">Analyze</h1>
-          <div className="page-sub">Neat share of the concentrate · change = Y − X · {changes} difference{changes === 1 ? '' : 's'}</div>
+          <div className="page-sub">Neat share of the concentrate · adjustment = Y − X · {changes} difference{changes === 1 ? '' : 's'}</div>
         </div>
       </div>
 
@@ -226,7 +226,7 @@ export function Compare({ a, b }: { a?: string; b?: string }) {
           <div className="cmp-list-head">
             <span>Material</span>
             <span>X → Y %</span>
-            <span>Change</span>
+            <span>Adjustment</span>
           </div>
           {groups.map((grp) => (
             <Fragment key={grp.g}>
@@ -271,7 +271,7 @@ export function Compare({ a, b }: { a?: string; b?: string }) {
               <th title="Tenacity on a blotter (TGSC substantivity) — fastest first within each group">Life h</th>
               <th>X %</th>
               <th>Y %</th>
-              <th title="Y − X: how much the share of the concentrate went up or down">Change</th>
+              <th title="Y − X: how much the share of the concentrate went up or down">Adjustment</th>
               <th className="l" style={{ width: 110 }} />
             </tr>
           </thead>

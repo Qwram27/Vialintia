@@ -1227,7 +1227,7 @@ img, svg { -webkit-user-drag: none; }
 
 /* Analyze on phones: a list that fits the card (no wide table) */
 .cmp-list { padding: 4px 14px 8px; }
-.cmp-list-head, .cmp-li { display: grid; grid-template-columns: minmax(0, 1fr) auto 70px; align-items: center; gap: 10px; }
+.cmp-list-head, .cmp-li { display: grid; grid-template-columns: minmax(0, 1fr) auto 86px; align-items: center; gap: 10px; }
 .cmp-list-head { padding: 10px 0 8px; font-size: 8.5px; letter-spacing: .18em; text-transform: uppercase; color: var(--faint); border-bottom: 1px solid var(--line-soft); }
 .cmp-list-head > :not(:first-child), .cmp-li > .xy, .cmp-li > .d { text-align: right; }
 .cmp-li { padding: 10px 0; border-bottom: 1px solid var(--line-soft); font-size: 12px; font-variant-numeric: tabular-nums; }
