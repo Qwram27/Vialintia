@@ -11,6 +11,9 @@ import { Seg } from '@/components/Seg'
 import { IconCopy, IconPlus, IconSearch, IconTrash, IconUpload } from '@/components/Icons'
 
 const STATUS_LABEL: Record<FormulaStatus, string> = { testing: 'Testing', final: 'Final' }
+const ALL = '\u0000all'
+const ACCORDS = '\u0000accords'
+const ACCORDS_LABEL = 'Accords'
 
 export function Dashboard() {
   const formulas = useStore((s) => s.formulas)
@@ -18,10 +21,59 @@ export function Dashboard() {
   const createFormula = useStore((s) => s.createFormula)
   const duplicateFormula = useStore((s) => s.duplicateFormula)
   const deleteFormula = useStore((s) => s.deleteFormula)
+  const updateFormula = useStore((s) => s.updateFormula)
   const materials = useMaterialMap()
   const accords = useAccordIndex()
   const [q, setQ] = useState('')
   const [status, setStatus] = useState<FormulaStatus | 'all'>('all')
+  const allMaterials = useStore((s) => s.materials)
+  const updateSettings = useStore((s) => s.updateSettings)
+  /** Formulas saved to Materials as an accord — shown together in the automatic Accords folder. */
+  const accordIds = useMemo(() => new Set(allMaterials.map((m) => m.accordFormulaId).filter(Boolean) as string[]), [allMaterials])
+  const folders = useMemo(() => {
+    const list = [...(settings.folders ?? [])]
+    for (const f of formulas) if (f.folder && !list.includes(f.folder)) list.push(f.folder)
+    return list
+  }, [settings.folders, formulas])
+  const [folder, setFolderState] = useState<string>(() => {
+    try {
+      return localStorage.getItem('vialintia.folder') ?? ALL
+    } catch {
+      return ALL
+    }
+  })
+  const setFolder = (v: string) => {
+    setFolderState(v)
+    try {
+      localStorage.setItem('vialintia.folder', v)
+    } catch {
+      /* ignore */
+    }
+  }
+  const activeFolder = folder === ALL || folder === ACCORDS || folders.includes(folder) ? folder : ALL
+  const inFolder = (f: Formula, fo: string) => (fo === ALL ? true : fo === ACCORDS ? accordIds.has(f.id) : f.folder === fo)
+  const [naming, setNaming] = useState<{ from: string | null; text: string } | null>(null)
+  const commitName = () => {
+    if (!naming) return
+    const name = naming.text.trim()
+    setNaming(null)
+    if (!name || name === naming.from) return
+    if (name === ACCORDS_LABEL || folders.includes(name)) return toast('A folder with that name already exists')
+    if (naming.from == null) {
+      updateSettings({ folders: [...folders, name] })
+    } else {
+      updateSettings({ folders: folders.map((x) => (x === naming.from ? name : x)) })
+      for (const f of formulas) if (f.folder === naming.from) updateFormula(f.id, (x) => ({ ...x, folder: name }), { history: false })
+    }
+    setFolder(name)
+  }
+  const deleteFolder = async (name: string) => {
+    const n = formulas.filter((f) => f.folder === name).length
+    if (!(await confirmDialog('Delete folder?', n ? `The ${n} formula${n > 1 ? 's' : ''} in “${name}” stay — they just leave the folder.` : `“${name}” is empty.`, 'Delete'))) return
+    updateSettings({ folders: folders.filter((x) => x !== name) })
+    for (const f of formulas) if (f.folder === name) updateFormula(f.id, (x) => ({ ...x, folder: undefined }), { history: false })
+    setFolder(ALL)
+  }
   const [sort, setSort] = useState<'updated' | 'name' | 'number'>('updated')
   const [view, setViewState] = useState<'grid' | 'index'>(() => {
     try {
@@ -42,6 +94,7 @@ export function Dashboard() {
   const list = useMemo(() => {
     const query = q.trim().toLowerCase()
     return formulas
+      .filter((f) => inFolder(f, activeFolder))
       .filter((f) => status === 'all' || f.status === status)
       .filter(
         (f) =>
@@ -62,9 +115,9 @@ export function Dashboard() {
         const v = currentVersion(f)
         return { f, v, no: concLabel(f), calc: computeFormula(f, v.rows, materials, settings, accords) }
       })
-  }, [formulas, materials, settings, accords, q, status, sort])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formulas, materials, settings, accords, q, status, sort, activeFolder, accordIds])
 
-  const updateFormula = useStore((s) => s.updateFormula)
   const remove = async (f: Formula) => {
     if (await confirmDialog('Delete formula', `“${f.name}” and all its versions and notes will be removed.`)) {
       deleteFormula(f.id)
@@ -82,6 +135,10 @@ export function Dashboard() {
           toast(`Duplicated ${f.name}`)
         }
       },
+      ...folders
+        .filter((x) => x !== f.folder)
+        .map((x, i) => ({ label: `Move to ${x}`, sep: i === 0, onSelect: () => updateFormula(f.id, (y) => ({ ...y, folder: x })) })),
+      ...(f.folder ? [{ label: `Remove from ${f.folder}`, sep: !folders.some((x) => x !== f.folder), onSelect: () => updateFormula(f.id, (y) => ({ ...y, folder: undefined })) }] : []),
       {
         label: f.status === 'final' ? 'Mark as testing' : 'Mark as final',
         sep: true,
@@ -91,10 +148,12 @@ export function Dashboard() {
     ])
 
   const counts = useMemo(() => {
-    const c = { all: formulas.length, testing: 0, final: 0 }
-    formulas.forEach((f) => c[f.status]++)
+    const inF = formulas.filter((f) => inFolder(f, activeFolder))
+    const c = { all: inF.length, testing: 0, final: 0 }
+    inF.forEach((f) => c[f.status]++)
     return c
-  }, [formulas])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formulas, activeFolder, accordIds])
 
   const importData = useStore((s) => s.importData)
   const settingsAll = useStore((s) => s.settings)
@@ -158,6 +217,53 @@ export function Dashboard() {
         </div>
       ) : (
         <>
+          <div className="folder-bar">
+            {[
+              { id: ALL, label: 'All' },
+              ...(accordIds.size ? [{ id: ACCORDS, label: ACCORDS_LABEL }] : []),
+              ...folders.map((x) => ({ id: x, label: x }))
+            ].map((x) =>
+              naming && naming.from === x.id ? null : (
+                <button key={x.id} className={`vchip${activeFolder === x.id ? ' on' : ''}`} onClick={() => setFolder(x.id)}>
+                  {x.label}
+                  <span className="faint">{formulas.filter((f) => inFolder(f, x.id)).length}</span>
+                </button>
+              )
+            )}
+            {naming ? (
+              <input
+                className="input input-sm folder-input"
+                autoFocus
+                placeholder="Folder name"
+                value={naming.text}
+                onChange={(e) => setNaming({ ...naming, text: e.target.value })}
+                onBlur={commitName}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') commitName()
+                  if (e.key === 'Escape') setNaming(null)
+                }}
+              />
+            ) : (
+              <button className="vchip folder-add" onClick={() => setNaming({ from: null, text: '' })} title="New folder">
+                <IconPlus size={12} /> Folder
+              </button>
+            )}
+            {activeFolder !== ALL && activeFolder !== ACCORDS && !naming && (
+              <span className="folder-tools">
+                <button className="btn btn-ghost btn-sm" onClick={() => setNaming({ from: activeFolder, text: activeFolder })}>
+                  Rename
+                </button>
+                <button className="btn btn-ghost btn-sm" onClick={() => deleteFolder(activeFolder)}>
+                  Delete
+                </button>
+              </span>
+            )}
+          </div>
+          {activeFolder === ACCORDS && <p className="faint small folder-note">Formulas saved to Materials as an accord (Save as accord in the formula).</p>}
+          {activeFolder !== ALL && activeFolder !== ACCORDS && list.length === 0 && !q && (
+            <p className="faint small folder-note">Empty folder — move formulas here with a right-click on a card, or set the folder in the formula (Details).</p>
+          )}
+
           <div className="toolbar">
             <div className="search" style={{ width: 300 }}>
               <IconSearch size={14} />
@@ -272,6 +378,7 @@ export function Dashboard() {
                 <div className="fcard-top">
                   <span className="fcard-no">{no}</span>
                   <span className="code">
+                    {f.folder && activeFolder === ALL ? `${f.folder} · ` : ''}
                     {seasonCode(f.createdAt)} / {v.label}
                   </span>
                 </div>
