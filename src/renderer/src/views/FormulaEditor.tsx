@@ -1596,6 +1596,7 @@ function Details({ formula, update }: { formula: Formula; update: (fn: (f: Formu
           }
         />
       </div>
+      <FolderField formula={formula} update={update} />
       <div className="grid-2">
         <div className="field">
           <label>Maceration started</label>
@@ -1644,6 +1645,43 @@ function Details({ formula, update }: { formula: Formula; update: (fn: (f: Formu
           ))}
         </div>
       </div>
+    </div>
+  )
+}
+
+/** Folder of the formula on the Formulas page: pick an existing one or type a new name. */
+function FolderField({ formula, update }: { formula: Formula; update: (fn: (f: Formula) => Formula, history?: boolean) => void }) {
+  const settings = useStore((s) => s.settings)
+  const formulas = useStore((s) => s.formulas)
+  const updateSettings = useStore((s) => s.updateSettings)
+  const folders = [...(settings.folders ?? [])]
+  for (const f of formulas) if (f.folder && !folders.includes(f.folder)) folders.push(f.folder)
+  const [text, setText] = useState(formula.folder ?? '')
+  useEffect(() => setText(formula.folder ?? ''), [formula.folder])
+  const commit = () => {
+    const name = text.trim()
+    if (name === (formula.folder ?? '')) return
+    if (name && !folders.includes(name)) updateSettings({ folders: [...folders, name] })
+    update((f) => ({ ...f, folder: name || undefined }))
+  }
+  return (
+    <div className="field" style={{ maxWidth: 360 }}>
+      <label>Folder</label>
+      <input
+        className="input"
+        list="vialintia-folders"
+        placeholder="No folder — type a name or pick one"
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
+      />
+      <datalist id="vialintia-folders">
+        {folders.map((f) => (
+          <option key={f} value={f} />
+        ))}
+      </datalist>
+      <span className="hint">Groups formulas on the Formulas page; the folder travels with the formula when you export it. Accords get their own folder automatically.</span>
     </div>
   )
 }

@@ -76,6 +76,8 @@ export interface Formula {
   versions: FormulaVersion[]
   currentVersionId: string
   notes: TestNote[]
+  /** Folder on the Formulas page (name, see Settings.folders). */
+  folder?: string
   /** Olfactive pyramid as it would be presented (note names, ordered). */
   pyramid?: NotePyramid
   assemblies?: Assembly[] // weighing sessions; the last one without finishedAt is in progress
@@ -131,6 +133,8 @@ export interface Settings {
   prefsVersion?: number // settings migrations already applied
   balanceStep: number // resolution of the user's scale in g (0.1 / 0.01 / 0.001)
   seedVersion?: number // starter-library version already merged into this library
+  /** Formula folders, in the order they were created (empty folders are kept). */
+  folders?: string[]
   /** User pictures for pyramid notes: lower-case note name → small JPEG data URL. */
   noteImages?: Record<string, string>
 }
