@@ -121,7 +121,7 @@ export function formulaToPdfHtml(formula: Formula, versionLabel: string, calc: F
       'Batch',
       formula.batch.mode === 'bottles'
         ? `${formula.batch.bottles} × ${fmtSmart(formula.batch.bottleMl)} ml (${fmt(b.productMl, 1)} ml)`
-        : `${fmt(b.concentrateG, 2)} g concentrate`
+        : `${fmt(b.productG, 2)} g product`
     ],
     ['Concentrate', `${fmt(b.concentrateG, 2)} g`],
     ['Alcohol', `${fmt(b.alcoholG, 2)} g  /  ${fmt(b.alcoholMl, 1)} ml`],

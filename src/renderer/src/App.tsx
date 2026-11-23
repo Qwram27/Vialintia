@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSaveState, useStore } from '@/store/store'
 import { navigate, useRoute, type Route } from '@/store/ui'
-import { catalogNo } from '@/lib/archive'
+import { concLabel } from '@/lib/archive'
 import { Dashboard } from '@/views/Dashboard'
 import { FormulaEditor } from '@/views/FormulaEditor'
 import { Assemble } from '@/views/Assemble'
@@ -86,7 +86,7 @@ export function App() {
                     onClick={() => navigate(`/formula/${f.id}`)}
                     title={f.name}
                   >
-                    <span className="idx">{catalogNo(f, formulas)}</span>
+                    <span className="idx">{concLabel(f)}</span>
                     <span>{f.name}</span>
                   </button>
                 ))}
@@ -154,13 +154,13 @@ function TopBar({ route, scrolled }: { route: Route; scrolled: boolean }) {
             <span className="sep">/</span>
             {route.name === 'assemble' ? (
               <>
-                <button onClick={() => navigate(`/formula/${formula.id}`)}>N°{catalogNo(formula, formulas)} {formula.name}</button>
+                <button onClick={() => navigate(`/formula/${formula.id}`)}>{concLabel(formula)} {formula.name}</button>
                 <span className="sep">/</span>
                 <span className="cur">Assemble</span>
               </>
             ) : (
               <span className="cur">
-                N°{catalogNo(formula, formulas)} {formula.name}
+                {concLabel(formula)} {formula.name}
               </span>
             )}
           </>

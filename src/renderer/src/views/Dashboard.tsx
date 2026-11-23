@@ -4,7 +4,8 @@ import { csvToFormula } from '@/lib/importFormula'
 import { currentVersion, useAccordIndex, useMaterialMap, useStore } from '@/store/store'
 import { confirmDialog, navigate, openContextMenu, toast } from '@/store/ui'
 import { computeFormula } from '@/lib/calc'
-import { catalogNo, seasonCode, shortDate } from '@/lib/archive'
+import { concLabel, seasonCode, shortDate } from '@/lib/archive'
+import { PRODUCT_PRESETS } from '@shared/defaults'
 import { NoteBar } from '@/components/Charts'
 import { Seg } from '@/components/Seg'
 import { IconCopy, IconPlus, IconSearch, IconTrash, IconUpload } from '@/components/Icons'
@@ -48,7 +49,7 @@ export function Dashboard() {
           f.name.toLowerCase().includes(query) ||
           f.tags.some((t) => t.toLowerCase().includes(query)) ||
           f.description.toLowerCase().includes(query) ||
-          catalogNo(f, formulas).includes(query)
+          concLabel(f).includes(query)
       )
       .sort((a, b) =>
         sort === 'name'
@@ -59,7 +60,7 @@ export function Dashboard() {
       )
       .map((f) => {
         const v = currentVersion(f)
-        return { f, v, no: catalogNo(f, formulas), calc: computeFormula(f, v.rows, materials, settings, accords) }
+        return { f, v, no: concLabel(f), calc: computeFormula(f, v.rows, materials, settings, accords) }
       })
   }, [formulas, materials, settings, accords, q, status, sort])
 
@@ -148,7 +149,7 @@ export function Dashboard() {
 
       {formulas.length === 0 ? (
         <div className="card empty">
-          <div className="mark">N°000</div>
+          <div className="mark">0%</div>
           <h3>The archive is empty</h3>
           <p>Start the first entry. Percentages, dilutions, IFRA and costs are calculated as you compose.</p>
           <button className="btn btn-primary mt" onClick={create}>
@@ -160,7 +161,7 @@ export function Dashboard() {
           <div className="toolbar">
             <div className="search" style={{ width: 300 }}>
               <IconSearch size={14} />
-              <input className="input" placeholder="Search name, tag, N°…" value={q} onChange={(e) => setQ(e.target.value)} />
+              <input className="input" placeholder="Search name, tag, %…" value={q} onChange={(e) => setQ(e.target.value)} />
             </div>
             <Seg
               value={status}
@@ -190,7 +191,7 @@ export function Dashboard() {
                 onChange={setSort}
                 options={[
                   { value: 'updated', label: 'Recent' },
-                  { value: 'number', label: 'N°' },
+                  { value: 'number', label: 'Oldest' },
                   { value: 'name', label: 'A–Z' }
                 ]}
               />
@@ -202,13 +203,13 @@ export function Dashboard() {
               <table className="ftable itable">
                 <thead>
                   <tr>
-                    <th className="l">N°</th>
+                    <th className="l">%</th>
                     <th className="l">Name</th>
                     <th className="l">Status</th>
                     <th className="l">Season</th>
                     <th className="l">Version</th>
                     <th>Mat.</th>
-                    <th>Conc.</th>
+                    <th className="l">Type</th>
                     <th className="l" style={{ width: 160 }}>Structure</th>
                     <th>IFRA</th>
                     <th>Updated</th>
@@ -225,7 +226,7 @@ export function Dashboard() {
                       <td className="l muted">{seasonCode(f.createdAt)}</td>
                       <td className="l muted">{v.label}</td>
                       <td className="muted">{calc.materialCount}</td>
-                      <td>{f.concentration}%</td>
+                      <td className="l muted">{productLabel(f.productType)}</td>
                       <td className="l">
                         <NoteBar byNote={calc.byNote} settings={settings} />
                       </td>
@@ -269,7 +270,7 @@ export function Dashboard() {
                   </button>
                 </div>
                 <div className="fcard-top">
-                  <span className="fcard-no">N°{no}</span>
+                  <span className="fcard-no">{no}</span>
                   <span className="code">
                     {seasonCode(f.createdAt)} / {v.label}
                   </span>
@@ -280,7 +281,7 @@ export function Dashboard() {
                   <span>·</span>
                   <span>{calc.materialCount} mat.</span>
                   <span>·</span>
-                  <span>{f.concentration}%</span>
+                  <span>{productLabel(f.productType)}</span>
                   {calc.ifra.worst === 'over' && <span className="ifra ifra-over">! IFRA</span>}
                 </div>
                 {f.description ? <div className="fcard-desc">{f.description}</div> : null}
@@ -304,4 +305,8 @@ export function Dashboard() {
       )}
     </div>
   )
+}
+
+function productLabel(t: string): string {
+  return t === 'custom' ? 'Author' : (PRODUCT_PRESETS as Record<string, { label: string }>)[t]?.label ?? t
 }

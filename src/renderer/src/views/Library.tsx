@@ -3,7 +3,6 @@ import type { Material, MaterialType, NoteLevel } from '@shared/types'
 import { NOTE_LABELS, NOTE_ORDER } from '@shared/defaults'
 import { familyById, useAccordIndex, useStore } from '@/store/store'
 import { confirmDialog, navigate, openContextMenu, toast } from '@/store/ui'
-import { catalogNo } from '@/lib/archive'
 import { fmt, fmtSmart, fmtTrim, inkOn } from '@/lib/calc'
 import { csvToMaterials, materialsToCsv } from '@/lib/exports'
 import { NumberInput } from '@/components/NumberInput'
@@ -479,7 +478,7 @@ function AccordInfoBox({ material }: { material: Material }) {
         <div className="spacer" />
         {f ? (
           <button className="btn btn-sm" onClick={() => navigate(`/formula/${f.id}`)}>
-            Open N°{catalogNo(f, formulas)}
+            Open formula
           </button>
         ) : (
           <span className="faint small">linked formula deleted</span>

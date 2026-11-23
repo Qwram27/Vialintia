@@ -23,3 +23,8 @@ export function shortDate(iso: string): string {
   const d = new Date(iso)
   return `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}`
 }
+
+/** Final concentration of the product as a short label: 25%, 17%, 12.5%. */
+export function concLabel(f: { concentration: number }): string {
+  return `${Number((f.concentration ?? 0).toFixed(2))}%`
+}
