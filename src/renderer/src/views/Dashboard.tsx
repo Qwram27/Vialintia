@@ -132,14 +132,20 @@ export function Dashboard() {
           toast(`Duplicated ${f.name}`)
         }
       },
-      ...folders
-        .filter((x) => x !== f.folder)
-        .map((x, i) => ({ label: `Move to ${x}`, sep: i === 0, onSelect: () => updateFormula(f.id, (y) => ({ ...y, folder: x })) })),
-      ...(f.folder ? [{ label: `Remove from ${f.folder}`, sep: !folders.some((x) => x !== f.folder), onSelect: () => updateFormula(f.id, (y) => ({ ...y, folder: undefined })) }] : []),
       {
-        label: f.status === 'final' ? 'Mark as testing' : 'Mark as final',
+        label: f.folder ? `Folder: ${f.folder}…` : 'Move to folder…',
         sep: true,
-        onSelect: () => updateFormula(f.id, (x) => ({ ...x, status: x.status === 'final' ? 'testing' : 'final' }))
+        // second menu at the same spot: the folders, the current one ticked
+        onSelect: () =>
+          openContextMenu({ clientX: e.clientX, clientY: e.clientY, preventDefault() {}, stopPropagation() {} }, [
+            ...folders.map((x) => ({
+              label: x === f.folder ? `✓ ${x}` : x,
+              disabled: x === f.folder,
+              onSelect: () => updateFormula(f.id, (y) => ({ ...y, folder: x }))
+            })),
+            f.folder ? { label: 'No folder', sep: folders.length > 0, onSelect: () => updateFormula(f.id, (y) => ({ ...y, folder: undefined })) } : null,
+            folders.length === 0 ? { label: 'No folders yet — add one with + Folder', disabled: true, onSelect: () => {} } : null
+          ])
       },
       { label: 'Delete', danger: true, sep: true, onSelect: () => remove(f) }
     ])
