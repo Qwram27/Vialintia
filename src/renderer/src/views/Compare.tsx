@@ -233,7 +233,9 @@ export function Compare({ a, b }: { a?: string; b?: string }) {
               <div className="cmp-li cmp-li-group">
                 <span className="nm">{grp.g === 'other' ? 'Missing materials' : `${NOTE_LABELS[grp.g]} notes`}</span>
                 <span className="xy">
-                  {fmtPct(grp.a)} → {fmtPct(grp.b)}
+                  <span className="xv">{fmtPct(grp.a)}</span>
+                  <span className="ar">→</span>
+                  <span className="xv">{fmtPct(grp.b)}</span>
                 </span>
                 <span className={`d ${deltaCls(grp.b - grp.a)}`}>{pts(grp.b - grp.a)}</span>
               </div>
@@ -247,7 +249,9 @@ export function Compare({ a, b }: { a?: string; b?: string }) {
                       <span className="t">{m?.name ?? 'Missing material'}</span>
                     </span>
                     <span className="xy">
-                      {d.a == null ? '—' : fmtPct(d.a)} → {d.b == null ? '—' : fmtPct(d.b)}
+                      {d.a == null ? <span className="xv none">—</span> : <span className="xv">{fmtPct(d.a)}</span>}
+                      <span className="ar">→</span>
+                      {d.b == null ? <span className="xv none">—</span> : <span className="xv">{fmtPct(d.b)}</span>}
                     </span>
                     <span className={`d ${deltaCls(d.delta, d.kind === 'same')}`}>{changeLabel(d)}</span>
                   </div>

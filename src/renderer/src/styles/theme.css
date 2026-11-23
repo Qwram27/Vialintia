@@ -1244,3 +1244,8 @@ img, svg { -webkit-user-drag: none; }
 
 /* button icons keep their size next to long labels */
 .btn svg { flex: none; }
+
+/* X → Y in fixed slots: numbers right-aligned, a missing side's dash centred, arrows in one column */
+.cmp-li .xy { display: inline-grid; grid-template-columns: 44px 14px 44px; align-items: center; justify-items: end; }
+.cmp-li .xy .ar { justify-self: center; color: var(--faint); }
+.cmp-li .xy .none { justify-self: center; color: var(--faint); }
