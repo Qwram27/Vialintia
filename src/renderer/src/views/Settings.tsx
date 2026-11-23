@@ -24,7 +24,7 @@ export function SettingsView() {
   async function restoreFromFile() {
     const text = await window.vialintia.importJson()
     if (!text) return
-    let data: Partial<AppData> & { seedVersion?: number; kind?: string; refMaterials?: Material[] }
+    let data: Partial<AppData> & { seedVersion?: number; kind?: string; refMaterials?: Material[]; folders?: string[] }
     try {
       data = JSON.parse(text)
     } catch {
@@ -271,7 +271,7 @@ export function SettingsView() {
                   // carry the materials the formulas use, so another device can match them by name
                   const used = new Set(formulas.flatMap((f) => f.versions.flatMap((v) => v.rows.map((r) => r.materialId))))
                   const refMaterials = materials.filter((m) => used.has(m.id))
-                  const file = { app: 'Vialintia', kind: 'formulas', version: 2, formulas, refMaterials }
+                  const file = { app: 'Vialintia', kind: 'formulas', version: 2, formulas, refMaterials, folders: settings.folders ?? [] }
                   const p = await window.vialintia.exportJson(JSON.stringify(file, null, 2), `vialintia-formulas-${stamp}.json`)
                   if (p) toast('Formulas exported')
                 }}
@@ -293,7 +293,9 @@ export function SettingsView() {
                 className="btn"
                 onClick={async () => {
                   const stamp = new Date().toISOString().slice(0, 10)
-                  const file = { app: 'Vialintia', kind: 'settings', version: 1, settings }
+                  // folders go with Export formulas, not with the settings
+                  const { folders: _f, ...rest } = settings
+                  const file = { app: 'Vialintia', kind: 'settings', version: 1, settings: rest }
                   const p = await window.vialintia.exportJson(JSON.stringify(file, null, 2), `vialintia-settings-${stamp}.json`)
                   if (p) toast('Settings exported')
                 }}

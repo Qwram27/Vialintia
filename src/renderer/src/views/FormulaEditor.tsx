@@ -1681,7 +1681,7 @@ function FolderField({ formula, update }: { formula: Formula; update: (fn: (f: F
           <option key={f} value={f} />
         ))}
       </datalist>
-      <span className="hint">Groups formulas on the Formulas page. Accords get their own folder automatically.</span>
+      <span className="hint">Groups formulas on the Formulas page; the folder travels with the formula when you export it. Accords get their own folder automatically.</span>
     </div>
   )
 }

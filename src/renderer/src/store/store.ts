@@ -34,7 +34,7 @@ interface State {
 
   updateSettings(patch: Partial<Settings>): void
   replaceAll(data: Partial<AppData> & { seedVersion?: number }): void
-  importData(data: Partial<AppData> & { refMaterials?: Material[] }): MergeStats
+  importData(data: Partial<AppData> & { refMaterials?: Material[]; folders?: string[] }): MergeStats
   resetAll(): void
 }
 
@@ -320,10 +320,18 @@ export const useStore = create<State>((set, get) => ({
         formulas: Array.isArray(data.formulas) ? data.formulas.map(normalizeFormula) : undefined
       }
     )
+    // Folders travel with the formulas: keep ours, add the file's list and any folder an imported formula uses.
+    const folders = [...(s.settings.folders ?? [])]
+    const addFolder = (f: unknown) => {
+      if (typeof f === 'string' && f.trim() && !folders.includes(f)) folders.push(f)
+    }
+    if (Array.isArray(data.folders)) data.folders.forEach(addFolder)
+    if (Array.isArray(data.formulas)) data.formulas.forEach((f) => addFolder(f.folder))
+    const base = data.settings ? { ...normalizeSettings(data.settings), seedVersion: s.settings.seedVersion } : s.settings
     set({
       materials: merged.materials,
       formulas: merged.formulas,
-      settings: data.settings ? { ...normalizeSettings(data.settings), seedVersion: s.settings.seedVersion } : s.settings,
+      settings: { ...base, folders },
       history: {}
     })
     return merged.stats

@@ -166,7 +166,7 @@ export function Dashboard() {
       if (text.trim().startsWith('{')) {
         const data = JSON.parse(text)
         if (!Array.isArray(data.formulas)) return toast('No formulas in that file')
-        const st = importData({ formulas: data.formulas, refMaterials: data.refMaterials ?? data.materials })
+        const st = importData({ formulas: data.formulas, refMaterials: data.refMaterials ?? data.materials, folders: data.folders })
         toast(`${st.formulasAdded} added, ${st.formulasUpdated} updated${st.missing ? ` · ${st.missing} rows missing a material` : ''}`)
         if (data.formulas.length === 1) navigate(`/formula/${data.formulas[0].id}`)
       } else {
