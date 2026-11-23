@@ -70,7 +70,9 @@ export function normalizeSettings(s: Partial<Settings> | undefined): Settings {
     nearLimitRatio,
     noteColors,
     families,
-    solvents: Array.isArray(s?.solvents) && s!.solvents.length ? s!.solvents : DEFAULT_SETTINGS.solvents
+    solvents: Array.isArray(s?.solvents) && s!.solvents.length ? s!.solvents : DEFAULT_SETTINGS.solvents,
+    // an Accords folder exists from the start (a plain folder — nothing is put there automatically)
+    folders: Array.isArray(s?.folders) ? s!.folders.filter((x) => typeof x === 'string') : ['Accords']
   }
 }
 
