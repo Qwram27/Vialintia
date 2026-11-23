@@ -5,11 +5,18 @@ import { familyById, useAccordIndex, useMaterialMap, useStore } from '@/store/st
 import { navigate } from '@/store/ui'
 import { computeFormula, DEFAULT_TENACITY, diffVersions, fmt, fmtPct, fmtTrim, type DiffKind, type DiffRow } from '@/lib/calc'
 import { Seg } from '@/components/Seg'
+import { useIsMobile } from '@/lib/useMobile'
 
 const KIND_LABEL: Record<DiffKind, string> = { added: 'Added', removed: 'Removed', changed: 'Changed', same: '' }
 const VOLATILITY: Record<NoteLevel, string> = { top: 'most volatile', heart: 'middle', base: 'most tenacious' }
-const signed = (v: number) => (Math.abs(v) < 0.0005 ? '·' : `${v > 0 ? '+' : '−'}${fmtPct(Math.abs(v))}`)
-const relLabel = (r: number) => `${r > 0 ? '+' : '−'}${fmt(Math.abs(r) * 100, 0)}%`
+/** Change in percentage points of the concentrate: +17.14, −0.035. */
+const pts = (v: number) => {
+  const a = Math.abs(v)
+  if (a < 0.0005) return '·'
+  return `${v > 0 ? '+' : '−'}${fmt(a, a >= 0.1 ? 2 : 3)}`
+}
+const deltaCls = (v: number, same = false) => (same || Math.abs(v) < 0.0005 ? 'dim' : v > 0 ? 'delta-up' : 'delta-down')
+const changeLabel = (d: DiffRow) => (d.kind === 'added' ? 'new' : d.kind === 'removed' ? 'gone' : d.kind === 'same' ? '·' : pts(d.delta))
 
 // Selection encoded as "formulaId:versionId"
 function parseSel(s: string | undefined, formulas: Formula[]) {
@@ -27,6 +34,7 @@ export function Compare({ a, b }: { a?: string; b?: string }) {
   const materials = useMaterialMap()
   const accords = useAccordIndex()
   const [show, setShow] = useState<'all' | 'changes'>('all')
+  const mobile = useIsMobile()
 
   // Sensible defaults: last two versions of the given (or most recent) formula.
   const selA = useMemo(() => {
@@ -110,7 +118,7 @@ export function Compare({ a, b }: { a?: string; b?: string }) {
         <div>
           <div className="page-kicker">Versions · Side by side</div>
           <h1 className="page-title">Analyze</h1>
-          <div className="page-sub">Neat share of the concentrate · totals aligned before comparing · {changes} difference{changes === 1 ? '' : 's'}</div>
+          <div className="page-sub">Neat share of the concentrate · change in percentage points (Y − X) · {changes} difference{changes === 1 ? '' : 's'}</div>
         </div>
       </div>
 
@@ -156,7 +164,7 @@ export function Compare({ a, b }: { a?: string; b?: string }) {
         <div className="card cmp-tile cmp-tile-main">
           <span className="v">{fmt(match, 0)}%</span>
           <span className="k">Match</span>
-          <small>same proportions, totals aligned</small>
+          <small>shared proportions of X and Y</small>
         </div>
         {([
           ['changed', 'Changed'],
@@ -213,6 +221,44 @@ export function Compare({ a, b }: { a?: string; b?: string }) {
         />
       </div>
 
+      {mobile ? (
+        <div className="card cmp-list">
+          <div className="cmp-list-head">
+            <span>Material</span>
+            <span>X → Y %</span>
+            <span>Δ pts</span>
+          </div>
+          {groups.map((grp) => (
+            <Fragment key={grp.g}>
+              <div className="cmp-li cmp-li-group">
+                <span className="nm">{grp.g === 'other' ? 'Missing materials' : `${NOTE_LABELS[grp.g]} notes`}</span>
+                <span className="xy">
+                  {fmtPct(grp.a)} → {fmtPct(grp.b)}
+                </span>
+                <span className={`d ${deltaCls(grp.b - grp.a)}`}>{pts(grp.b - grp.a)}</span>
+              </div>
+              {grp.rows.map((d) => {
+                const m = materials.get(d.materialId)
+                const fam = m ? familyById(settings, m.family) : null
+                return (
+                  <div key={d.materialId} className={`cmp-li${d.kind === 'removed' ? ' gone' : ''}${d.kind === 'same' ? ' same' : ''}`}>
+                    <span className="nm">
+                      <span className="dot" style={{ background: fam?.color ?? 'var(--faint)' }} />
+                      <span className="t">{m?.name ?? 'Missing material'}</span>
+                    </span>
+                    <span className="xy">
+                      {d.a == null ? '—' : fmtPct(d.a)} → {d.b == null ? '—' : fmtPct(d.b)}
+                    </span>
+                    <span className={`d ${deltaCls(d.delta, d.kind === 'same')}`}>{changeLabel(d)}</span>
+                  </div>
+                )
+              })}
+            </Fragment>
+          ))}
+          {diff.length > 0 && groups.length === 0 && <div className="empty">No differences — both versions are the same.</div>}
+          {diff.length === 0 && <div className="empty">Both selections are empty.</div>}
+        </div>
+      ) : (
       <div className="card" style={{ padding: '4px 12px 10px' }}>
         <table className="ftable cmp-table">
           <thead>
@@ -221,7 +267,7 @@ export function Compare({ a, b }: { a?: string; b?: string }) {
               <th title="Tenacity on a blotter (TGSC substantivity) — fastest first within each group">Life h</th>
               <th>X %</th>
               <th>Y %</th>
-              <th title="Change of the material itself, after aligning both totals">Change</th>
+              <th title="Y − X in percentage points of the concentrate">Δ pts</th>
               <th className="l" style={{ width: 110 }} />
             </tr>
           </thead>
@@ -238,7 +284,7 @@ export function Compare({ a, b }: { a?: string; b?: string }) {
                   <td />
                   <td>{fmtPct(grp.a)}</td>
                   <td>{fmtPct(grp.b)}</td>
-                  <td className={Math.abs(grp.b - grp.a) < 0.0005 ? 'dim' : grp.b > grp.a ? 'delta-up' : 'delta-down'}>{signed(grp.b - grp.a)}</td>
+                  <td className={deltaCls(grp.b - grp.a)}>{pts(grp.b - grp.a)}</td>
                   <td className="l">
                     <small>{grp.changed ? `${grp.changed} change${grp.changed > 1 ? 's' : ''}` : 'unchanged'}</small>
                   </td>
@@ -257,7 +303,7 @@ export function Compare({ a, b }: { a?: string; b?: string }) {
                       <td className="muted">{m?.tenacityHours ? fmtTrim(m.tenacityHours) : <span className="dim">—</span>}</td>
                       <td className={d.a == null ? 'dim' : ''}>{d.a == null ? '—' : fmtPct(d.a)}</td>
                       <td className={d.b == null ? 'dim' : ''}>{d.b == null ? '—' : fmtPct(d.b)}</td>
-                      <td className={d.kind === 'same' ? 'dim' : (d.rel ?? d.delta) > 0 ? 'delta-up' : 'delta-down'}>{d.kind === 'same' ? '·' : d.rel != null ? relLabel(d.rel) : d.kind === 'added' ? 'new' : 'gone'}</td>
+                      <td className={deltaCls(d.delta, d.kind === 'same')}>{changeLabel(d)}</td>
                       <td className="l">
                         <span
                           className="diff-kind"
@@ -265,7 +311,7 @@ export function Compare({ a, b }: { a?: string; b?: string }) {
                             color: d.kind === 'added' ? 'var(--ok)' : d.kind === 'removed' ? 'var(--over)' : d.kind === 'changed' ? 'var(--near)' : 'var(--faint)'
                           }}
                         >
-                          {d.kind === 'changed' ? ((d.rel ?? d.delta) > 0 ? '▲ More' : '▼ Less') : d.kind === 'added' ? '+ Added' : d.kind === 'removed' ? '− Removed' : KIND_LABEL[d.kind]}
+                          {d.kind === 'changed' ? (d.delta > 0 ? '▲ More' : '▼ Less') : d.kind === 'added' ? '+ Added' : d.kind === 'removed' ? '− Removed' : KIND_LABEL[d.kind]}
                         </span>
                       </td>
                     </tr>
@@ -278,6 +324,7 @@ export function Compare({ a, b }: { a?: string; b?: string }) {
         {diff.length > 0 && groups.length === 0 && <div className="empty">No differences — both versions are the same.</div>}
         {diff.length === 0 && <div className="empty">Both selections are empty.</div>}
       </div>
+      )}
     </div>
   )
 }

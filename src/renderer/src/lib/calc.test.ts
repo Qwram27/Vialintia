@@ -165,6 +165,24 @@ describe('helpers', () => {
     expect(d.find((x) => x.materialId === 'c')!.kind).toBe('added')
   })
 
+  it('diffVersions reports the change in percentage points', () => {
+    const materials = new Map([['a', mat('a')], ['b', mat('b')]])
+    const f = formula()
+    const A = computeFormula(f, [
+      { id: '1', materialId: 'a', amount: 1, dilution: 100 },
+      { id: '2', materialId: 'b', amount: 3, dilution: 100 }
+    ], materials, settings)
+    const B = computeFormula(f, [
+      { id: '1', materialId: 'a', amount: 1, dilution: 100 },
+      { id: '2', materialId: 'b', amount: 1, dilution: 100 }
+    ], materials, settings)
+    const d = diffVersions(A.rows, B.rows)
+    const a = d.find((x) => x.materialId === 'a')!
+    expect(a.delta).toBeCloseTo(B.rows[0].neatPct - A.rows[0].neatPct)
+    expect(a.kind).toBe('changed')
+    expect(d.find((x) => x.materialId === 'b')!.delta).toBeLessThan(0)
+  })
+
   it('evolution: a top note alone fades out', () => {
     const materials = new Map([['a', mat('a', { tenacityHours: 4, note: 'top' })]])
     const c = computeFormula(formula(), [{ id: '1', materialId: 'a', amount: 1, dilution: 100 }], materials, settings)
