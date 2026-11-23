@@ -963,7 +963,7 @@ function MobileComposition({
             )}
             <button className={`m-row${entry?.status === 'over' ? ' over' : ''}`} onClick={() => setEditId(r.row.id)}>
               <span className="m-row-no">{String(idx + 1).padStart(2, '0')}</span>
-              <span className="m-row-main">
+              <span className="m-row-top">
                 <span className="m-row-name">
                   {m ? (
                     <>
@@ -974,28 +974,45 @@ function MobileComposition({
                     <span className="missing">Missing material</span>
                   )}
                 </span>
-                <span className="m-row-meta">
-                  {m && (
-                    <span className="note-pill" style={{ background: settings.noteColors[m.note], color: inkOn(settings.noteColors[m.note]) }}>
-                      {NOTE_LABELS[m.note].slice(0, 1)}
-                    </span>
-                  )}
-                  <span>{r.row.dilution < 100 ? `${fmtSmart(r.row.dilution)}%${r.row.solvent ? ` ${r.row.solvent}` : ''}` : 'neat'}</span>
-                  <span>·</span>
-                  <span>{fmtPct(r.neatPct)} active</span>
-                  {showBatch && (
-                    <>
-                      <span>·</span>
-                      <span>{fmtSmart(r.batchGrams)} g batch</span>
-                    </>
-                  )}
+                <span className="m-row-amt">
+                  {fmtSmart(r.row.amount)}
+                  <small>{unit}</small>
                 </span>
               </span>
-              <span className="m-row-amt">
-                <span className="v">{fmtSmart(r.row.amount)}</span>
-                <span className="u">{unit}</span>
-                <IfraBadge entry={entry} />
+              <span className="m-row-stats">
+                <span className="st">
+                  <span className="k">Note</span>
+                  {m ? (
+                    <span className="v note-v">
+                      <i style={{ background: settings.noteColors[m.note] }} />
+                      {NOTE_LABELS[m.note]}
+                    </span>
+                  ) : (
+                    <span className="v">—</span>
+                  )}
+                </span>
+                <span className="st">
+                  <span className="k">Dilution</span>
+                  <span className="v">{r.row.dilution < 100 ? `${Number(r.row.dilution.toFixed(2))}%${r.row.solvent ? ` ${r.row.solvent}` : ''}` : 'Neat'}</span>
+                </span>
+                <span className="st">
+                  <span className="k">Active</span>
+                  <span className="v">{fmtPct(r.neatPct)}</span>
+                </span>
+                {showBatch ? (
+                  <span className="st">
+                    <span className="k">Batch</span>
+                    <span className="v">{fmtSmart(r.batchGrams)} g</span>
+                  </span>
+                ) : (
+                  <span className="st" />
+                )}
               </span>
+              {entry && entry.status !== 'ok' && (
+                <span className="m-row-ifra">
+                  <IfraBadge entry={entry} />
+                </span>
+              )}
             </button>
             </Fragment>
           )
