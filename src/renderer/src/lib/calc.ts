@@ -56,6 +56,10 @@ export interface FormulaCalc {
   materialCount: number
   batch: BatchCalc
   ifra: IfraResult
+  /** Neat aroma share of the concentrate as weighed (0..1) — below 1 when rows are diluted. */
+  neatShare: number
+  /** Real neat aroma % in the finished product: the set concentration, unless the dilutions make it impossible. */
+  actualConcentration: number
 }
 
 // ---------------------------------------------------------------- accords
@@ -69,6 +73,8 @@ export interface AccordInfo {
   parts: AccordPart[] // fully expanded (nested accords resolved)
   costPerKg: number // per kg of accord as weighed, from component prices
   missing: boolean // linked formula not found
+  /** Neat aroma share of the accord as weighed (0..1): its rows' dilution solvent is not aroma. */
+  neatShare: number
 }
 export type AccordIndex = Map<string, AccordInfo>
 
@@ -85,12 +91,13 @@ export function buildAccordIndex(materials: Material[], formulas: Formula[], set
     if (done) return done
     const f = m.accordFormulaId ? fById.get(m.accordFormulaId) : undefined
     const v = f && (f.versions.find((x) => x.id === f.currentVersionId) ?? f.versions[f.versions.length - 1])
-    if (!f || !v) return { formulaId: m.accordFormulaId ?? '', parts: [], costPerKg: 0, missing: true }
+    if (!f || !v) return { formulaId: m.accordFormulaId ?? '', parts: [], costPerKg: 0, missing: true, neatShare: 1 }
     stack.add(m.id)
     const grams = v.rows.map((r) => rowGrams(r, f.unit, settings))
     const total = grams.reduce((a, b) => a + b, 0)
     const parts = new Map<string, AccordPart>()
     let cost = 0
+    let neat = 0
     v.rows.forEach((r, i) => {
       const sub = byId.get(r.materialId)
       if (!sub || total <= 0) return
@@ -103,15 +110,17 @@ export function buildAccordIndex(materials: Material[], formulas: Formula[], set
           else parts.set(p.material.id, { material: p.material, fraction: frac * p.fraction })
         }
         cost += frac * (sub.pricePerKg ?? inner.costPerKg)
+        neat += frac * inner.neatShare
       } else if (!sub.accordFormulaId) {
         const cur = parts.get(sub.id)
         if (cur) cur.fraction += frac
         else parts.set(sub.id, { material: sub, fraction: frac })
         cost += frac * (sub.pricePerKg ?? 0)
+        neat += frac
       }
     })
     stack.delete(m.id)
-    const info: AccordInfo = { formulaId: f.id, parts: [...parts.values()], costPerKg: cost, missing: false }
+    const info: AccordInfo = { formulaId: f.id, parts: [...parts.values()], costPerKg: cost, missing: false, neatShare: total > 0 ? neat : 1 }
     index.set(m.id, info)
     return info
   }
@@ -184,7 +193,8 @@ export function computeIfra(
     if (!r.material) continue
     const acc = r.material.accordFormulaId ? accords?.get(r.material.id) : undefined
     // An accord counts through its constituents (plus its own limit, if one was entered).
-    if (acc) for (const p of acc.parts) add(p.material, r.neatPct * p.fraction)
+    // r.neatPct is already the accord's aroma only, so its parts are shares of that aroma
+    if (acc) for (const p of acc.parts) add(p.material, (r.neatPct * p.fraction) / (acc.neatShare > 0 ? acc.neatShare : 1))
     if (!acc || r.material.ifraLimit != null) add(r.material, r.neatPct)
   }
   const entries: IfraEntry[] = []
@@ -289,9 +299,12 @@ export function computeFormula(
   const base = rows.map((row) => {
     const material = materials.get(row.materialId)
     const grams = rowGrams(row, formula.unit, settings)
-    const neatGrams = (grams * clampPct(row.dilution)) / 100
-    const price = material?.pricePerKg ?? (material?.accordFormulaId ? accords?.get(material.id)?.costPerKg : undefined)
-    const cost = price ? (neatGrams * price) / 1000 : 0
+    const asBought = (grams * clampPct(row.dilution)) / 100 // material as bought, without this row's own solvent
+    const acc = material?.accordFormulaId ? accords?.get(material.id) : undefined
+    // an accord brings the solvent of its own diluted rows too — only its aroma counts as neat
+    const neatGrams = asBought * (acc && !acc.missing ? acc.neatShare : 1)
+    const price = material?.pricePerKg ?? acc?.costPerKg
+    const cost = price ? (asBought * price) / 1000 : 0
     return { row, material, grams, neatGrams, cost }
   })
   const totalGrams = base.reduce((s, r) => s + r.grams, 0)
@@ -336,7 +349,9 @@ export function computeFormula(
     byFamily,
     materialCount: new Set(rows.filter((r) => materials.has(r.materialId)).map((r) => r.materialId)).size,
     batch,
-    ifra: computeIfra(calcRows, conc, settings, accords, share)
+    ifra: computeIfra(calcRows, conc, settings, accords, share),
+    neatShare: share,
+    actualConcentration: totalGrams > 0 && neatGrams > 0 ? Math.min(conc, share * 100) : conc
   }
 }
 
@@ -467,6 +482,21 @@ export function parseNum(input: string): number | null {
 }
 
 /** Compact number without trailing zeros (e.g. 8, 0.5, 12.25). */
+/**
+ * Decimals for a column of numbers: the fewest that show every value exactly (up to `max`),
+ * but at least `min` — the same for all, so the column lines up (0.5, 1.0, 2.0 · 0.125, 1.000).
+ */
+export function sharedDecimals(values: number[], min = 1, max = 3): number {
+  let d = min
+  for (const v of values) {
+    if (!Number.isFinite(v)) continue
+    const s = v.toFixed(max).replace(/0+$/, '')
+    const need = s.includes('.') ? s.length - s.indexOf('.') - 1 : 0
+    if (need > d) d = need
+  }
+  return Math.min(d, max)
+}
+
 export function fmtTrim(n: number | null | undefined, maxDigits = 4): string {
   if (n == null || !Number.isFinite(n)) return '—'
   return String(Number(n.toFixed(maxDigits)))
