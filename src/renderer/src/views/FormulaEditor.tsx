@@ -5,7 +5,7 @@ import { NOTE_LABELS, NOTE_ORDER, PRODUCT_PRESETS } from '@shared/defaults'
 import { currentVersion, familyById, useAccordIndex, useMaterialMap, useStore, withRows } from '@/store/store'
 import { confirmDialog, navigate, openContextMenu, toast, withProgress } from '@/store/ui'
 import { isWeb } from '@/platform'
-import { computeFormula, fmt, fmtPct, fmtSmart, inkOn, moveRow, reduceAccordRow, removeRow, roundToStep, sectionBlocks, stepRow, type RowDrop, rowIfraEntry, scaleRows, type FormulaCalc } from '@/lib/calc'
+import { computeFormula, fmt, fmtPct, fmtSmart, fmtTrim, inkOn, moveRow, reduceAccordRow, removeRow, roundToStep, sectionBlocks, stepRow, type RowDrop, rowIfraEntry, scaleRows, type FormulaCalc } from '@/lib/calc'
 import { formulaToCsv, formulaToPdfHtml } from '@/lib/exports'
 import { uid } from '@/lib/id'
 import { NumberInput } from '@/components/NumberInput'
@@ -974,10 +974,7 @@ function MobileComposition({
                     <span className="missing">Missing material</span>
                   )}
                 </span>
-                <span className="m-row-amt">
-                  {fmtSmart(r.row.amount)}
-                  <small>{unit}</small>
-                </span>
+                <span className="m-row-amt">{fmtTrim(r.row.amount, formula.unit === 'drops' ? 2 : 4)}</span>
               </span>
               <span className="m-row-stats">
                 <span className="st">
@@ -1023,10 +1020,14 @@ function MobileComposition({
         <div className="m-total">
           <span>Total</span>
           <span>
-            {fmtSmart(rows.reduce((s, r) => s + (r.amount || 0), 0))} {unit}
-            {formula.unit !== 'g' ? ` · ${fmtSmart(calc.totalGrams)} g` : ''}
+            {fmtTrim(rows.reduce((s, r) => s + (r.amount || 0), 0), 4)} {unit}
+            {formula.unit !== 'g' ? ` · ${fmtTrim(calc.totalGrams, 4)} g` : ''}
           </span>
-          <span className="faint">{fmtPct(formula.concentration)} in product</span>
+          <span className="faint">
+            {calc.neatShare < 0.9999 ? `aroma ${fmtPct(calc.neatShare * 100)} of the concentrate · ` : ''}
+            {fmtPct(calc.actualConcentration)} in product
+            {calc.actualConcentration < formula.concentration - 0.005 ? ` (set ${fmtTrim(formula.concentration, 2)}%)` : ''}
+          </span>
         </div>
       )}
 
@@ -1220,6 +1221,11 @@ function Inspector({
             </div>
           </div>
         </div>
+        {calc.actualConcentration < formula.concentration - 0.005 && (
+          <p className="hint conc-hint">
+            Actual {fmtPct(calc.actualConcentration)} aroma in the product — the diluted rows bring solvent, so the concentrate itself is only {fmtPct(calc.neatShare * 100)} aroma.
+          </p>
+        )}
       </section>
       <section className="insp-sec">
         <h3 className="card-title">

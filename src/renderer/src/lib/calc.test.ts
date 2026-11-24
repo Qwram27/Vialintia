@@ -212,6 +212,34 @@ describe('helpers', () => {
   })
 })
 
+describe('dilutions in the concentrate and in accords', () => {
+  it('a diluted formula cannot be 100 % aroma', () => {
+    const materials = new Map([['a', mat('a')], ['b', mat('b')]])
+    const f = { ...formula(), concentration: 100 }
+    const c = computeFormula(f, [
+      { id: '1', materialId: 'a', amount: 7, dilution: 100 },
+      { id: '2', materialId: 'b', amount: 3, dilution: 10 }
+    ], materials, settings)
+    expect(c.neatShare).toBeCloseTo(0.73)
+    expect(c.actualConcentration).toBeCloseTo(73)
+  })
+
+  it('an accord used as an ingredient counts only its aroma', () => {
+    const a = mat('a')
+    const acc = mat('acc', { accordFormulaId: 'F1' })
+    const accFormula: Formula = { ...formula(), id: 'F1', versions: [{ id: 'v', label: 'V1', createdAt: '', rows: [
+      { id: '1', materialId: 'a', amount: 1, dilution: 10 },
+      { id: '2', materialId: 'a', amount: 1, dilution: 100 }
+    ] }], currentVersionId: 'v' }
+    const index = buildAccordIndex([a, acc], [accFormula], settings)
+    expect(index.get('acc')!.neatShare).toBeCloseTo(0.55)
+    const materials = new Map([['a', a], ['acc', acc]])
+    const c = computeFormula(formula(), [{ id: 'x', materialId: 'acc', amount: 10, dilution: 100 }], materials, settings, index)
+    expect(c.rows[0].neatGrams).toBeCloseTo(5.5)
+    expect(c.rows[0].neatPct).toBeCloseTo(55)
+  })
+})
+
 describe('archive codes', async () => {
   const { seasonCode } = await import('./archive')
   it('names AV by the year it runs into', () => {
@@ -323,7 +351,9 @@ describe('accords', () => {
     const e = c.ifra.byMaterial.get('citral')!
     // citral neat in concentrate: (10 * 0.025 + 0.1) / 10.1 * 100 %
     expect(e.neatPct).toBeCloseTo(((10 * 0.025 + 0.1) / 10.1) * 100)
-    expect(e.productPct).toBeCloseTo((e.neatPct * 20) / 100)
+    // the accord's own dilution solvent is not aroma: more concentrate goes in, so the product % rises by 1 / neat share
+    expect(c.neatShare).toBeLessThan(1)
+    expect(e.productPct).toBeCloseTo((e.neatPct * 20) / 100 / c.neatShare)
     expect(rowIfraEntry(c.ifra, accM, idx)).toBe(e)
   })
 

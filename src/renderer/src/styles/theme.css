@@ -1306,3 +1306,4 @@ img, svg { -webkit-user-drag: none; }
   .asm-amt-btn .v { font-size: 18px; }
   .asm-actions .btn-primary { flex: 1; justify-content: center; }
 }
+.conc-hint { margin: 10px 0 0; font-size: 10.5px; line-height: 1.6; color: var(--muted); }
