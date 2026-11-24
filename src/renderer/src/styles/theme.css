@@ -1266,3 +1266,43 @@ img, svg { -webkit-user-drag: none; }
   .folder-bar > * { flex: none; }
   .folder-tools .btn { height: 40px; }
 }
+
+/* Assemble: a tick-off list — the amount to add, big; ✓ when it is in; tap the amount to correct it */
+.asm-guide { padding: 14px 16px; margin-bottom: 12px; }
+.asm-guide p { margin: 10px 0 0; font-size: 11.5px; line-height: 1.6; color: var(--text-2); }
+.asm-progress { display: flex; flex-direction: column; gap: 8px; }
+.asm-progress .k { font-size: 9.5px; letter-spacing: .2em; text-transform: uppercase; color: var(--text); }
+.asm-progress .track { height: 3px; border-radius: 2px; background: rgba(255,255,255,.08); overflow: hidden; }
+.asm-progress .track > span { display: block; height: 100%; background: var(--text); transition: width .3s var(--ease); }
+.asm-steps { display: flex; flex-direction: column; gap: 6px; }
+.asm-step {
+  display: grid; grid-template-columns: 26px minmax(0, 1fr) auto 48px; align-items: center; gap: 12px;
+  padding: 10px 10px 10px 14px; border-radius: 10px; min-height: 64px;
+  background: linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.02));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.07), inset 0 0 0 1px rgba(255,255,255,.04);
+}
+.asm-step.current { box-shadow: inset 0 1px 0 rgba(255,255,255,.1), inset 0 0 0 1px rgba(255,255,255,.45); }
+.asm-step.done .asm-what, .asm-step.done .asm-amt, .asm-step.done .asm-no { opacity: .45; }
+.asm-no { font-size: 10px; color: var(--faint); letter-spacing: .08em; }
+.asm-what { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.asm-what .nm { display: flex; align-items: center; gap: 8px; font-size: 13px; min-width: 0; }
+.asm-what .sub { font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.asm-alc .nm { letter-spacing: .14em; text-transform: uppercase; font-size: 11.5px; }
+.asm-amt { display: flex; justify-content: flex-end; min-width: 0; }
+.asm-amt-btn { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; background: none; border: 0; padding: 4px 2px; color: var(--text); cursor: pointer; text-align: right; }
+.asm-amt-btn .v { font-size: 20px; font-weight: 300; letter-spacing: -0.03em; line-height: 1; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.asm-amt-btn .hint { font-size: 9.5px; color: var(--faint); letter-spacing: .06em; white-space: nowrap; }
+.asm-amt .asm-input { width: 110px; text-align: right; height: 44px; font-size: 16px; }
+.asm-tick {
+  width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; cursor: pointer;
+  border-radius: var(--ctl, 7px); border: 1px solid rgba(255,255,255,.18); background: rgba(255,255,255,.04); color: var(--muted);
+}
+.asm-tick.on { background: var(--fill); border-color: var(--fill-line); color: var(--fill-ink); }
+.asm-dev { margin: 12px 2px 0; }
+.asm-actions { display: flex; align-items: center; gap: 8px; margin-top: 14px; }
+@media (max-width: 700px) {
+  .asm-step { grid-template-columns: minmax(0, 1fr) auto 48px; gap: 10px; padding: 10px 10px 10px 12px; }
+  .asm-no { display: none; }
+  .asm-amt-btn .v { font-size: 18px; }
+  .asm-actions .btn-primary { flex: 1; justify-content: center; }
+}

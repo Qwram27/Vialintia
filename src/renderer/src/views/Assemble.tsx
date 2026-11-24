@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import type { Assembly, Formula } from '@shared/types'
 import { currentVersion, familyById, useAccordIndex, useMaterialMap, useStore } from '@/store/store'
 import { confirmDialog, navigate, toast } from '@/store/ui'
@@ -20,6 +20,7 @@ export function Assemble({ id }: { id: string }) {
     () => (formula && version ? computeFormula(formula, version.rows, materials, settings, accords) : null),
     [formula, version, materials, settings, accords]
   )
+  const [editing, setEditing] = useState<string | null>(null)
   if (!formula || !version || !calc) {
     return (
       <div className="page">
@@ -102,19 +103,18 @@ export function Assemble({ id }: { id: string }) {
               <span className="v">{fmt(calc.rows.reduce((s, x) => s + (x.material ? toDrops(x.batchGrams) : 0), 0), 0)} drops · ≈ {show(r(b.concentrateG))} g</span>
             </div>
           ) : (
-            <div className="stat-row"><span className="k">Concentrate</span><span className="v">{show(r(b.concentrateG))} g</span></div>
+            <div className="stat-row"><span className="k">Materials together</span><span className="v">{show(r(b.concentrateG))} g</span></div>
           )}
           <div className="stat-row"><span className="k">Then alcohol</span><span className="v">{show(r(b.alcoholG))} g · {fmt(b.alcoholMl, 1)} ml</span></div>
           <div className="stat-row"><span className="k">Ingredients</span><span className="v">{calc.rows.filter((x) => x.material && x.batchGrams > 0).length}</span></div>
           {calc.rows.some((x) => x.material && x.batchGrams > 0 && x.row.dilution < 100) && (
             <p className="faint small">
-              Dilutions are already counted: diluted rows are weighed as their solutions, so more concentrate is weighed and the alcohol is reduced by
-              the solvent they bring — the product still ends up at {concLabel(formula)} neat aroma.
+              Diluted materials are weighed as their solutions — the alcohol amount already allows for the solvent they bring.
             </p>
           )}
           <p className="faint small">Change the batch size in the formula (Setup → Batch) before you start.</p>
           <button className="btn btn-primary mt" disabled={!(b.concentrateG > 0) || calc.rows.length === 0} onClick={start}>
-            Start assembling
+            Start
           </button>
         </div>
         <History history={history} labels={labels} show={show} />
@@ -130,104 +130,156 @@ export function Assemble({ id }: { id: string }) {
     return { ...x, i, reading: r(reading) }
   })
   const weighed = draft.rows.reduce((s, x) => s + (x.actual ?? 0), 0)
-  const targetTotal = draft.rows.reduce((s, x) => s + x.target, 0)
   const doneCount = draft.rows.filter((x) => x.actual != null).length
   const setActual = (rowId: string, v: number | null) =>
     patchDraft((a) => ({ ...a, rows: a.rows.map((x) => (x.rowId === rowId ? { ...x, actual: v == null ? null : ru(v) } : x)) }))
   const doneTarget = draft.rows.filter((x) => x.actual != null).reduce((s, x) => s + x.target, 0)
   const deviation = ru(weighed - doneTarget)
 
+  const alcoholDone = draft.alcoholActual != null
+  const allDone = current === -1 && alcoholDone
+  const amount = (v: number) => (drops ? `${fmt(v, 0)} drop${v === 1 ? '' : 's'}` : `${show(v)} g`)
+
   return (
     <div className="page asm">
       {head}
-      <div className="asm-summary card">
-        <div className="metric"><div className="k">Done</div><div className="v">{doneCount}<small>/ {draft.rows.length}</small></div></div>
-        <div className="metric"><div className="k">{drops ? 'Counted' : 'Weighed'}</div><div className="v">{showU(ru(weighed))}<small>{U}</small></div></div>
-        <div className="metric"><div className="k">Target</div><div className="v">{showU(ru(targetTotal))}<small>{U}</small></div></div>
-        <div className="metric">
-          <div className="k">Deviation</div>
-          <div className="v">{doneCount ? `${deviation >= 0 ? '+' : ''}${showU(deviation)}` : '—'}<small>{U}</small></div>
+
+      <div className="card asm-guide">
+        <div className="asm-progress">
+          <span className="k">
+            {doneCount} of {draft.rows.length} in{alcoholDone ? ' · alcohol added' : ''}
+          </span>
+          <span className="track">
+            <span style={{ width: `${((doneCount + (alcoholDone ? 1 : 0)) / (draft.rows.length + 1)) * 100}%` }} />
+          </span>
         </div>
+        <p>
+          {drops
+            ? 'Count the drops of each material into the bottle, in this order. Tap ✓ when it is in. Added a different number? Tap the amount and type what went in.'
+            : 'Put the bottle on the scale and tare it. Add each material in this order and tap ✓ when it is in. Weighed a bit more or less? Tap the amount and type what the scale showed.'}
+        </p>
       </div>
 
-      <div className="card asm-list">
-        <div className="asm-row asm-headrow">
-          <span>N°</span><span>Material</span><span className="n">Target {U}</span><span className="n">{drops ? 'Counted' : 'Weighed g'}</span><span className="n">{drops ? '≈ g' : 'Scale'}</span><span />
-        </div>
+      <div className="asm-steps">
         {rows.map((x) => {
           const m = materials.get(x.materialId)
-          const dev = x.actual != null ? x.actual - x.target : null
+          const done = x.actual != null
+          const off = done && x.actual !== x.target
           return (
-            <div key={x.rowId} className={`asm-row${x.i === current ? ' current' : ''}${x.actual != null ? ' done' : ''}`}>
-              <span className="no">{String(x.i + 1).padStart(2, '0')}</span>
-              <span className="mat">
+            <div key={x.rowId} className={`asm-step${x.i === current ? ' current' : ''}${done ? ' done' : ''}`}>
+              <span className="asm-no">{String(x.i + 1).padStart(2, '0')}</span>
+              <span className="asm-what">
                 <span className="nm">
                   {m && <span className="dot" style={{ background: familyById(settings, m.family).color }} />}
                   {m?.name ?? 'Missing material'}
                 </span>
-                <span className="meta">{x.dilution < 100 ? `${fmtSmart(x.dilution)}% dilution` : 'neat'}{dev != null && (drops ? dev !== 0 : Math.abs(dev) >= step / 2) ? ` · ${dev > 0 ? '+' : ''}${showU(ru(dev))} ${U}` : ''}</span>
+                <span className="sub">{x.dilution < 100 ? `${Number(x.dilution.toFixed(2))}% solution` : 'neat'}</span>
               </span>
-              <span className="n tgt">{showU(x.target)}</span>
-              <span className="n">
-                <NumberInput className="input asm-input" value={x.actual} min={0} allowEmpty placeholder={showU(x.target)} onCommit={(v) => setActual(x.rowId, v)} />
+              <span className="asm-amt">
+                {editing === x.rowId ? (
+                  <NumberInput
+                    className="input asm-input"
+                    value={x.actual ?? x.target}
+                    min={0}
+                    autoFocus
+                    onCommit={(v) => {
+                      setActual(x.rowId, v ?? x.target)
+                      setEditing(null)
+                    }}
+                  />
+                ) : (
+                  <button type="button" className="asm-amt-btn" onClick={() => setEditing(x.rowId)} title="Type the amount that actually went in">
+                    <span className="v">{amount(x.actual ?? x.target)}</span>
+                    <span className="hint">
+                      {off ? `planned ${amount(x.target)}` : drops ? `≈ ${show(r(x.target * dropG))} g` : `scale ${show(x.reading)} g`}
+                    </span>
+                  </button>
+                )}
               </span>
-              <span className="n faint">{drops ? show(r((x.actual ?? x.target) * dropG)) : show(x.reading)}</span>
-              <span className="n">
-                <button
-                  className={`btn btn-icon${x.actual != null ? ' btn-primary' : ''}`}
-                  title={x.actual != null ? 'Clear' : 'Weighed exactly the target'}
-                  onClick={() => setActual(x.rowId, x.actual != null ? null : x.target)}
-                >
-                  <IconCheck size={15} />
-                </button>
-              </span>
+              <button
+                type="button"
+                className={`asm-tick${done ? ' on' : ''}`}
+                aria-label={done ? 'Undo' : 'In'}
+                onClick={() => {
+                  setEditing(null)
+                  setActual(x.rowId, done ? null : x.target)
+                }}
+              >
+                <IconCheck size={18} />
+              </button>
             </div>
           )
         })}
-        <div className={`asm-row asm-alcohol${current === -1 && draft.alcoholActual == null ? ' current' : ''}${draft.alcoholActual != null ? ' done' : ''}`}>
-          <span className="no">+</span>
-          <span className="mat">
+
+        <div className={`asm-step asm-alc${current === -1 && !alcoholDone ? ' current' : ''}${alcoholDone ? ' done' : ''}`}>
+          <span className="asm-no">+</span>
+          <span className="asm-what">
             <span className="nm">Alcohol</span>
-            <span className="meta">add to the concentrate · {fmt(calc.batch.alcoholMl, 1)} ml{drops ? ' · weighed in g' : ''}</span>
+            <span className="sub">top up last · {fmt(calc.batch.alcoholMl, 1)} ml</span>
           </span>
-          <span className="n tgt">{show(draft.alcoholG)}{drops ? ' g' : ''}</span>
-          <span className="n">
-            <NumberInput className="input asm-input" value={draft.alcoholActual} min={0} allowEmpty placeholder={show(draft.alcoholG)} onCommit={(v) => patchDraft((a) => ({ ...a, alcoholActual: v == null ? null : r(v) }))} />
+          <span className="asm-amt">
+            {editing === 'alcohol' ? (
+              <NumberInput
+                className="input asm-input"
+                value={draft.alcoholActual ?? draft.alcoholG}
+                min={0}
+                autoFocus
+                onCommit={(v) => {
+                  patchDraft((a) => ({ ...a, alcoholActual: r(v ?? a.alcoholG) }))
+                  setEditing(null)
+                }}
+              />
+            ) : (
+              <button type="button" className="asm-amt-btn" onClick={() => setEditing('alcohol')}>
+                <span className="v">{show(draft.alcoholActual ?? draft.alcoholG)} g</span>
+                <span className="hint">
+                  {draft.alcoholActual != null && draft.alcoholActual !== draft.alcoholG
+                    ? `planned ${show(draft.alcoholG)} g`
+                    : drops
+                      ? 'on the scale'
+                      : `scale ${show(r(reading + (draft.alcoholActual ?? draft.alcoholG)))} g`}
+                </span>
+              </button>
+            )}
           </span>
-          <span className="n faint">{drops ? show(draft.alcoholActual ?? draft.alcoholG) : show(r(reading + (draft.alcoholActual ?? draft.alcoholG)))}</span>
-          <span className="n">
-            <button
-              className={`btn btn-icon${draft.alcoholActual != null ? ' btn-primary' : ''}`}
-              onClick={() => patchDraft((a) => ({ ...a, alcoholActual: a.alcoholActual != null ? null : a.alcoholG }))}
-            >
-              <IconCheck size={15} />
-            </button>
-          </span>
+          <button
+            type="button"
+            className={`asm-tick${alcoholDone ? ' on' : ''}`}
+            aria-label={alcoholDone ? 'Undo' : 'In'}
+            onClick={() => {
+              setEditing(null)
+              patchDraft((a) => ({ ...a, alcoholActual: a.alcoholActual != null ? null : a.alcoholG }))
+            }}
+          >
+            <IconCheck size={18} />
+          </button>
         </div>
       </div>
 
-      <div className="row mt" style={{ flexWrap: 'wrap', gap: 8 }}>
-        <span className="faint small" style={{ flex: '1 1 240px' }}>
-          {drops
-            ? 'Type how many drops went in, or tick ✓ if you hit the target. “≈ g” is the drop count converted with the drop mass from Settings.'
-            : 'Type what the scale shows, or tick ✓ if you hit the target. “Scale” is the reading when everything goes into one tared vessel.'}
-        </span>
+      {doneCount > 0 && Math.abs(deviation) > 0 && (
+        <p className="faint small asm-dev">
+          So far {deviation > 0 ? 'more' : 'less'} than planned by {showU(Math.abs(deviation))} {U} ({showU(ru(weighed))} instead of {showU(ru(doneTarget))} {U}).
+        </p>
+      )}
+
+      <div className="asm-actions">
         <button
           className="btn btn-ghost"
           onClick={async () => {
-            if (await confirmDialog('Discard this session?', 'The weighed amounts entered so far will be removed.', 'Discard')) save((list) => list.filter((a) => a.id !== draft.id))
+            if (await confirmDialog('Discard this session?', 'What you ticked so far will be removed.', 'Discard')) save((list) => list.filter((a) => a.id !== draft.id))
           }}
         >
           Discard
         </button>
+        <div className="spacer" />
         <button
           className="btn btn-primary"
           onClick={() => {
             patchDraft((a) => ({ ...a, finishedAt: new Date().toISOString() }))
-            toast('Assembly saved')
+            toast(allDone ? 'Assembly saved' : 'Saved — not every step was ticked')
           }}
         >
-          Finish & save
+          <IconCheck size={14} /> Finish
         </button>
       </div>
       <History history={history} labels={labels} show={show} />
