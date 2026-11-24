@@ -482,6 +482,21 @@ export function parseNum(input: string): number | null {
 }
 
 /** Compact number without trailing zeros (e.g. 8, 0.5, 12.25). */
+/**
+ * Decimals for a column of numbers: the fewest that show every value exactly (up to `max`),
+ * but at least `min` — the same for all, so the column lines up (0.5, 1.0, 2.0 · 0.125, 1.000).
+ */
+export function sharedDecimals(values: number[], min = 1, max = 3): number {
+  let d = min
+  for (const v of values) {
+    if (!Number.isFinite(v)) continue
+    const s = v.toFixed(max).replace(/0+$/, '')
+    const need = s.includes('.') ? s.length - s.indexOf('.') - 1 : 0
+    if (need > d) d = need
+  }
+  return Math.min(d, max)
+}
+
 export function fmtTrim(n: number | null | undefined, maxDigits = 4): string {
   if (n == null || !Number.isFinite(n)) return '—'
   return String(Number(n.toFixed(maxDigits)))

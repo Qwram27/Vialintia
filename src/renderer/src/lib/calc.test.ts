@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_SETTINGS } from '@shared/defaults'
 import type { Formula, Material } from '@shared/types'
-import { buildAccordIndex, computeFormula, diffVersions, evoAxis, evoAxisInv, evolution, ifraStatus, moveRow, parseNum, reduceAccordRow, removeRow, roundToStep, sectionBlocks, stepRow, rowIfraEntry, scaleRows } from './calc'
+import { sharedDecimals, buildAccordIndex, computeFormula, diffVersions, evoAxis, evoAxisInv, evolution, ifraStatus, moveRow, parseNum, reduceAccordRow, removeRow, roundToStep, sectionBlocks, stepRow, rowIfraEntry, scaleRows } from './calc'
 import { SEED_VERSION, seedMaterials, upgradeSeedLibrary } from '@/data/seedMaterials'
 
 const now = new Date().toISOString()
@@ -237,6 +237,15 @@ describe('dilutions in the concentrate and in accords', () => {
     const c = computeFormula(formula(), [{ id: 'x', materialId: 'acc', amount: 10, dilution: 100 }], materials, settings, index)
     expect(c.rows[0].neatGrams).toBeCloseTo(5.5)
     expect(c.rows[0].neatPct).toBeCloseTo(55)
+  })
+})
+
+describe('number columns', () => {
+  it('use one shared count of decimals, at least one', () => {
+    expect(sharedDecimals([1, 2, 6])).toBe(1)
+    expect(sharedDecimals([1, 0.82, 6])).toBe(2)
+    expect(sharedDecimals([1, 0.125, 0.5])).toBe(3)
+    expect(sharedDecimals([0.12345])).toBe(3)
   })
 })
 
