@@ -17,6 +17,7 @@ import { catalogNo, concLabel, seasonCode, shortDate } from '@/lib/archive'
 import { Stars } from '@/components/Overlays'
 import { Sheet } from '@/components/Sheet'
 import { Pyramid } from '@/views/Pyramid'
+import { LabelsDialog } from '@/views/Labels'
 import { useIsMobile } from '@/lib/useMobile'
 import {
   IconAlert, IconAnalyze, IconCheck, IconPercent, IconCopy, IconDownload, IconFile, IconGrip, IconPlus,
@@ -133,6 +134,7 @@ function EditorFoot({
   const materials = useStore((s) => s.materials)
   const addMaterial = useStore((s) => s.addMaterial)
   const [scaling, setScaling] = useState(false)
+  const [labels, setLabels] = useState(false)
   const safeName = formula.name.replace(/[\\/:*?"<>|]+/g, '').trim() || 'formula'
   const fileBase = `${safeName} - ${versionLabel}`
   const accord = materials.find((m) => m.accordFormulaId === formula.id)
@@ -205,6 +207,10 @@ function EditorFoot({
       >
         <IconFile /> PDF
       </button>
+      <button className="btn" title="Print bottle labels — many per A4 sheet" onClick={() => setLabels(true)}>
+        <IconFile /> Labels
+      </button>
+      {labels && <LabelsDialog formulaId={formula.id} onClose={() => setLabels(false)} />}
       {scaling && <ScaleDialog formula={formula} calc={calc} settings={settings} update={update} onClose={() => setScaling(false)} />}
     </div>
   )
