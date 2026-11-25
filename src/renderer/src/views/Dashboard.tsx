@@ -9,6 +9,7 @@ import { PRODUCT_PRESETS } from '@shared/defaults'
 import { NoteBar } from '@/components/Charts'
 import { Seg } from '@/components/Seg'
 import { useLongPress } from '@/lib/useLongPress'
+import { LabelsDialog } from '@/views/Labels'
 import { IconCopy, IconPlus, IconSearch, IconTrash, IconUpload } from '@/components/Icons'
 
 const STATUS_LABEL: Record<FormulaStatus, string> = { testing: 'Testing', final: 'Final' }
@@ -121,10 +122,12 @@ export function Dashboard() {
     }
   }
   const press = useLongPress()
+  const [labelsFor, setLabelsFor] = useState<string | null>(null)
   const cardMenu = (e: { clientX: number; clientY: number; preventDefault(): void; stopPropagation(): void }, f: Formula) =>
     openContextMenu(e, [
       { label: 'Open', onSelect: () => navigate(`/formula/${f.id}`) },
       { label: 'Assemble fragrance', onSelect: () => navigate(`/formula/${f.id}/assemble`) },
+      { label: 'Print labels…', onSelect: () => setLabelsFor(f.id) },
       {
         label: 'Duplicate',
         onSelect: () => {
@@ -412,6 +415,7 @@ export function Dashboard() {
           )}
         </>
       )}
+      {labelsFor && <LabelsDialog id={labelsFor} onClose={() => setLabelsFor(null)} />}
     </div>
   )
 }

@@ -9,7 +9,8 @@ import { NumberInput } from '@/components/NumberInput'
 import { Seg } from '@/components/Seg'
 import { useIsMobile } from '@/lib/useMobile'
 import { Sheet } from '@/components/Sheet'
-import { IconDownload, IconPlus, IconSearch, IconTrash, IconUpload, IconX } from '@/components/Icons'
+import { IconDownload, IconFile, IconPlus, IconSearch, IconTrash, IconUpload, IconX } from '@/components/Icons'
+import { LabelsDialog } from '@/views/Labels'
 
 const TYPES: Record<MaterialType, string> = { natural: 'Natural', synthetic: 'Synthetic', base: 'Base / accord', other: 'Other' }
 type SortKey = 'name' | 'family' | 'note' | 'ifra' | 'price'
@@ -29,6 +30,7 @@ export function Library() {
   const mobile = useIsMobile()
   const deleteMaterial = useStore((s) => s.deleteMaterial)
 
+  const [labelsFor, setLabelsFor] = useState<string | null>(null)
   const usage = useMemo(() => {
     const m = new Map<string, number>()
     for (const f of formulas) {
@@ -41,6 +43,7 @@ export function Library() {
   const rowMenu = (e: React.MouseEvent, m: Material) =>
     openContextMenu(e, [
       { label: 'Edit', onSelect: () => setSelected(m.id) },
+      { label: 'Print labels…', onSelect: () => setLabelsFor(m.id) },
       !!m.accordFormulaId && { label: 'Open accord formula', onSelect: () => navigate(`/formula/${m.accordFormulaId}`) },
       {
         label: 'Duplicate',
@@ -109,6 +112,7 @@ export function Library() {
 
   return (
     <div className="page page-wide" style={{ maxWidth: 1700 }}>
+      {labelsFor && <LabelsDialog kind="material" id={labelsFor} onClose={() => setLabelsFor(null)} />}
       <div className="page-head">
         <div>
           <div className="page-kicker">Index · Raw materials</div>
@@ -319,6 +323,7 @@ function MaterialDrawer({ material, usage, onClose }: { material: Material; usag
     })
   }, [material.id])
 
+  const [labels, setLabels] = useState(false)
   const set = (patch: Partial<Material>) => updateMaterial(material.id, patch)
   const text = (key: keyof typeof draft, multiline = false, placeholder = '') => {
     const props = {
@@ -342,6 +347,10 @@ function MaterialDrawer({ material, usage, onClose }: { material: Material; usag
           Material
         </span>
         <div className="spacer" />
+        <button className="btn btn-sm" onClick={() => setLabels(true)} title="Print bottle labels for this material">
+          <IconFile size={14} /> Labels
+        </button>
+        {labels && <LabelsDialog kind="material" id={material.id} onClose={() => setLabels(false)} />}
         <button className="btn btn-ghost btn-icon" onClick={onClose} title="Close">
           <IconX />
         </button>
