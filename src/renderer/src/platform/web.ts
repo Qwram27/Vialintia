@@ -156,7 +156,8 @@ async function printPdf(html: string, defaultName: string): Promise<string | nul
     const A4_PX = 794 // 210 mm at 96 dpi
     const frame = document.createElement('iframe')
     frame.setAttribute('aria-hidden', 'true')
-    frame.style.cssText = `position:fixed;left:-10000px;top:0;width:${A4_PX}px;height:40px;border:0;background:#fff`
+    frame.style.cssText = `position:fixed;left:-10000px;top:0;width:${A4_PX}px;max-width:${A4_PX}px;height:40px;border:0;background:#fff`
+    frame.setAttribute('scrolling', 'no')
     document.body.appendChild(frame)
     try {
       const doc = frame.contentDocument!
@@ -179,7 +180,11 @@ async function printPdf(html: string, defaultName: string): Promise<string | nul
         const slice = document.createElement('canvas')
         slice.width = canvas.width
         slice.height = h
-        slice.getContext('2d')!.drawImage(canvas, 0, y, canvas.width, h, 0, 0, canvas.width, h)
+        const g = slice.getContext('2d')!
+        // white first: JPEG has no alpha, so any transparent edge (iOS stretches the frame) would turn black
+        g.fillStyle = '#ffffff'
+        g.fillRect(0, 0, slice.width, slice.height)
+        g.drawImage(canvas, 0, y, canvas.width, h, 0, 0, canvas.width, h)
         if (page > 0) pdf.addPage()
         pdf.addImage(slice.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, pageW, h / pxPerPt)
         step(0.75 + 0.2 * Math.min(1, (y + h) / canvas.height))

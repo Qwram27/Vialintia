@@ -1378,3 +1378,4 @@ img, svg { -webkit-user-drag: none; }
   .sheet-drawer .seg button { min-height: 32px; padding: 8px 8px; }
 }
 .drawer > .hint { color: var(--faint); font-size: 10px; line-height: 1.5; }
+.lbl-shadow { position: absolute; left: 0; top: 0; }

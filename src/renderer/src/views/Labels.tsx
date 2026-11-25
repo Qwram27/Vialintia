@@ -1,4 +1,4 @@
-import { useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useStore } from '@/store/store'
 import { toast, withProgress } from '@/store/ui'
@@ -191,7 +191,7 @@ export function LabelsDialog({ kind = 'fragrance', id, onClose }: { kind?: Label
           </div>
 
           <div className="lbl-preview" ref={box} style={{ height: SHEET_PX_H * scale }}>
-            <iframe title="Label sheet preview" srcDoc={html} sandbox="" style={{ width: SHEET_PX_W, height: SHEET_PX_H, transform: `scale(${scale})` }} />
+            <SheetPreview html={html} scale={scale} />
           </div>
         </div>
 
@@ -209,3 +209,26 @@ export function LabelsDialog({ kind = 'fragrance', id, onClose }: { kind?: Label
   )
 }
 
+
+/**
+ * First sheet of the label PDF, scaled into the dialog. Rendered in a shadow root, not an
+ * iframe: iOS Safari stretches iframes to their content and the scaled preview came out
+ * cut off with black edges. The shadow root also keeps the label CSS away from the app.
+ */
+function SheetPreview({ html, scale }: { html: string; scale: number }) {
+  const host = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const el = host.current
+    if (!el) return
+    const root = el.shadowRoot ?? el.attachShadow({ mode: 'open' })
+    const css = /<style>([\s\S]*?)<\/style>/.exec(html)?.[1] ?? ''
+    const body = /<body>([\s\S]*?)<\/body>/.exec(html)?.[1] ?? ''
+    const first = /<div class="sheet">[\s\S]*?(?=<div class="sheet">|$)/.exec(body)?.[0] ?? body
+    root.innerHTML = `<style>${css}
+      :host { all: initial; display: block; }
+      .pv { width: ${SHEET_PX_W}px; height: ${SHEET_PX_H}px; background: #fff; color: #000; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; transform-origin: 0 0; overflow: hidden; }
+      .pv .sheet { margin-bottom: 0; }
+    </style><div class="pv" style="transform: scale(${scale})">${first}</div>`
+  }, [html, scale])
+  return <div ref={host} className="lbl-shadow" />
+}

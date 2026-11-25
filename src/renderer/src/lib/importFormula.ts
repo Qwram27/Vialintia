@@ -32,7 +32,7 @@ export function csvToFormula(text: string, fileName: string, settings: Settings)
   const vId = uid()
   const f: Formula = {
     id: uid(), name, description: '', tags: [], status: 'testing', unit: 'g', productType: 'edp',
-    concentration: PRODUCT_PRESETS.edp.concentration, batch: { mode: 'bottles', bottles: 1, bottleMl: 50, massG: 10 },
+    concentration: PRODUCT_PRESETS.edp.concentration, batch: { mode: 'bottles', bottles: 1, bottleMl: 5, massG: 5 },
     versions: [{ id: vId, label: 'V1', createdAt: now0, rows: [] }], currentVersionId: vId, notes: [], assemblies: [],
     createdAt: now0, updatedAt: now0
   }
