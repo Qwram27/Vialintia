@@ -65,7 +65,7 @@ export function labelData(f: Formula): LabelData {
 
 export function materialLabelData(m: Material, dilution = m.defaultDilution ?? 100, solvent = m.solvent): LabelData {
   const dil = dilution < 100 ? `${Number(dilution.toFixed(2))}% ${solvent || 'EtOH'}` : '100%'
-  return { kind: 'material', name: m.name, code: `CAS ${m.cas?.trim() || '—'}`, info: dil, infoShort: dil, sub: '' }
+  return { kind: 'material', name: m.name, code: m.cas?.trim() || '—', info: dil, infoShort: dil, sub: '' }
 }
 
 export function perSheet(w: number, h: number): { cols: number; rows: number; count: number } {
@@ -87,7 +87,7 @@ function labelHtml(d: LabelData, o: LabelOptions): string {
       ? `<span class="br house">${esc(o.author)}</span>`
       : `<span class="br">${o.w >= 30 ? MARK : ''}<b>VIALINTIA</b></span>`
   return `<div class="lb" style="--k:${k}">
-  <div class="top">${brand}${d.code ? `<span class="cd">${esc(o.w < 35 ? d.code.replace(/^CAS /, '') : d.code)}</span>` : ''}</div>
+  <div class="top">${brand}${d.code ? `<span class="cd">${esc(d.code)}</span>` : ''}</div>
   <div class="mid">
     <div class="nm${d.kind === 'material' ? ' mat' : ''}">${esc(d.name)}</div>
     ${d.sub ? `<div class="sub">${esc(d.sub)}</div>` : ''}
