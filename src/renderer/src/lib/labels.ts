@@ -32,7 +32,7 @@ export interface LabelOptions {
 
 /** Fragrance labels carry the author (perfume house); material labels the lab (Vialintia). */
 export type LabelKind = 'fragrance' | 'material'
-export const DEFAULT_AUTHOR = 'Aen Anvii'
+export const DEFAULT_AUTHOR = ''
 
 export interface LabelEntry {
   id: string // formula id or material id
