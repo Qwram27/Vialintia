@@ -1379,3 +1379,16 @@ img, svg { -webkit-user-drag: none; }
 }
 .drawer > .hint { color: var(--faint); font-size: 10px; line-height: 1.5; }
 .lbl-shadow { position: absolute; left: 0; top: 0; }
+
+/* labels dialog on phones: a full-screen page inside the safe areas, header and buttons pinned */
+@media (max-width: 700px) {
+  .lbl-overlay { padding: 0; align-items: stretch; z-index: 300; backdrop-filter: none; background: var(--bg); }
+  .lbl-modal {
+    width: 100vw; max-width: 100vw; height: var(--app-h, 100dvh); max-height: none; border-radius: 0; box-shadow: none;
+    background: var(--bg); backdrop-filter: none; animation: none;
+    padding: 0 calc(16px + var(--sar)) 0 calc(16px + var(--sal)); gap: 14px;
+  }
+  .lbl-head { position: sticky; top: 0; z-index: 2; background: var(--bg); padding: calc(var(--sat) + 10px) 0 10px; margin: 0; border-bottom: 1px solid var(--line-soft); }
+  .lbl-actions { position: sticky; bottom: 0; z-index: 2; background: var(--bg); padding: 10px 0 calc(var(--sab) + 10px); margin: 0; border-top: 1px solid var(--line-soft); }
+  .lbl-actions .btn-primary { flex: 1; justify-content: center; }
+}

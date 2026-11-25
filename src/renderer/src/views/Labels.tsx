@@ -79,9 +79,9 @@ export function LabelsDialog({ kind = 'fragrance', id, onClose }: { kind?: Label
   }
 
   return createPortal(
-    <div className="overlay" onMouseDown={onClose}>
+    <div className="overlay lbl-overlay" onMouseDown={onClose}>
       <div className="modal lbl-modal" onMouseDown={(e) => e.stopPropagation()}>
-        <div className="row" style={{ alignItems: 'center' }}>
+        <div className="row lbl-head" style={{ alignItems: 'center' }}>
           <h3 style={{ margin: 0 }}>{isMat ? 'Material labels' : 'Bottle labels'}</h3>
           <div className="spacer" />
           <button className="btn btn-ghost btn-icon" onClick={onClose} aria-label="Close">
@@ -195,7 +195,7 @@ export function LabelsDialog({ kind = 'fragrance', id, onClose }: { kind?: Label
           </div>
         </div>
 
-        <div className="modal-actions">
+        <div className="modal-actions lbl-actions">
           <button className="btn btn-ghost" onClick={onClose}>
             Close
           </button>
