@@ -115,9 +115,9 @@ export function labelsToPdfHtml(items: LabelData[], o: LabelOptions): string {
   .lb { position: relative; width: ${o.w}mm; height: ${o.h}mm; padding: calc(1.7mm * var(--k)) calc(2.3mm * var(--k)); display: flex; flex-direction: column; justify-content: space-between; overflow: hidden; border: 0.15mm solid #c8c8c8; }
   .lb.blank { border: 0.15mm dashed #e4e4e4; }
   .top, .bt { display: flex; justify-content: space-between; align-items: baseline; gap: 1.2mm; text-transform: uppercase; white-space: nowrap; }
-  .top { font-size: calc(4.5pt * var(--k)); letter-spacing: .14em; align-items: center; line-height: 1; }
+  .top { font-size: calc(4.5pt * var(--k)); letter-spacing: .14em; align-items: center; line-height: 1.25; }
   .bt { font-size: calc(5.2pt * var(--k)); letter-spacing: .12em; }
-  .br { display: inline-flex; align-items: center; gap: calc(0.9mm * var(--k)); min-width: 0; overflow: hidden; }
+  .br { display: inline-flex; align-items: center; gap: calc(0.9mm * var(--k)); min-width: 0; }
   .br svg { width: calc(1.8mm * var(--k)); height: calc(2.6mm * var(--k)); flex: none; }
   .br b, .house { font-weight: 700; letter-spacing: .3em; }
   .cd { color: #555; flex: none; }
