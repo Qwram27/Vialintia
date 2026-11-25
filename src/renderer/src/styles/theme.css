@@ -1322,3 +1322,5 @@ img, svg { -webkit-user-drag: none; }
   .lbl-grid { grid-template-columns: minmax(0, 1fr); }
   .lbl-modal { width: calc(100vw - 20px); padding: 18px 16px 14px; }
 }
+.lbl-entry.mat { grid-template-columns: minmax(0, 1fr) 84px 64px 12px auto; }
+.lbl-dil .input { text-align: right; padding-right: 22px; }

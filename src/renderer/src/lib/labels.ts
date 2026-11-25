@@ -3,8 +3,8 @@
  * Sizes are real millimetres — the PDF page is 210 mm wide with 12.7 mm margins
  * (same as the formula sheet), so a sheet's usable area is 184.6 × 271.6 mm.
  */
-import type { Formula } from '@shared/types'
-import { PRODUCT_PRESETS } from '@shared/defaults'
+import type { Formula, Material } from '@shared/types'
+import { NOTE_LABELS, PRODUCT_PRESETS } from '@shared/defaults'
 import { seasonCode } from './archive'
 
 export interface LabelSize {
@@ -24,23 +24,28 @@ export interface LabelOptions {
   w: number
   h: number
   volume: string // "10 ml"
-  date: string // ISO date (yyyy-mm-dd) or '' to leave out
-  showNotes: boolean
   skip: number // labels already used on the first sheet (start further down)
 }
 
+/** Fragrance labels carry the perfume house; material labels the lab (Vialintia). */
+export type LabelKind = 'fragrance' | 'material'
+export const FRAGRANCE_BRAND = 'Aen Anvii'
+
 export interface LabelEntry {
-  formulaId: string
+  id: string // formula id or material id
   copies: number
+  dilution?: number // materials: % of the material in the bottle (100 = neat)
+  solvent?: string
 }
 
-/** What one label prints (resolved from a formula). */
+/** What one label prints. */
 export interface LabelData {
+  kind: LabelKind
   name: string
-  product: string // "Extrait 25%"
-  productShort: string // "EDT 10%" — for narrow labels
-  code: string // "AV27 · V2"
-  notes: string // "Kiwi · Lime · White Musk"
+  code: string // top right: "AV27 · V2" / "Heart"
+  info: string // bottom left: "Extrait 25%" / "10% EtOH"
+  infoShort: string // the same for narrow labels: "EDT 10%"
+  extra: string // bottom middle (wide labels): CAS for materials
 }
 
 export const SHEET_W = 184.6
@@ -51,10 +56,13 @@ export function labelData(f: Formula): LabelData {
   const v = f.versions.find((x) => x.id === f.currentVersionId) ?? f.versions[f.versions.length - 1]
   const type = f.productType === 'custom' ? '' : PRODUCT_PRESETS[f.productType]?.label ?? ''
   const conc = `${Number(f.concentration.toFixed(2))}%`
-  const p = f.pyramid
-  const notes = p ? [...p.top.slice(0, 1), ...p.heart.slice(0, 1), ...p.base.slice(0, 1)].join(' · ') : ''
   const short = { edt: 'EDT', edp: 'EDP', edc: 'EDC', parfum: 'Extrait' }[f.productType as string] ?? ''
-  return { name: f.name, product: type ? `${type} ${conc}` : conc, productShort: short ? `${short} ${conc}` : conc, code: `${seasonCode(f.createdAt)} · ${v?.label ?? ''}`, notes }
+  return { kind: 'fragrance', name: f.name, code: `${seasonCode(f.createdAt)} · ${v?.label ?? ''}`, info: type ? `${type} ${conc}` : conc, infoShort: short ? `${short} ${conc}` : conc, extra: '' }
+}
+
+export function materialLabelData(m: Material, dilution = m.defaultDilution ?? 100, solvent = m.solvent): LabelData {
+  const dil = dilution < 100 ? `${Number(dilution.toFixed(2))}% ${solvent || 'EtOH'}` : 'Neat'
+  return { kind: 'material', name: m.name, code: NOTE_LABELS[m.note] ?? '', info: dil, infoShort: dil, extra: m.cas ? `CAS ${m.cas}` : '' }
 }
 
 export function perSheet(w: number, h: number): { cols: number; rows: number; count: number } {
@@ -67,22 +75,16 @@ const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&l
 
 const MARK = `<svg viewBox="132 76 256 360" xmlns="http://www.w3.org/2000/svg" fill="none" stroke-linecap="square" stroke-linejoin="miter"><path d="M138 88 H310 L374 152 V424 H138 Z" stroke="#000" stroke-width="22"/><path d="M310 88 V152 H374" stroke="#000" stroke-width="22"/><path d="M184 180 L230 300 L276 180" stroke="#000" stroke-width="32"/><path d="M184 352 H328 M184 386 H294" stroke="#777" stroke-width="22"/></svg>`
 
-function fmtDate(iso: string): string {
-  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso)
-  return m ? `${m[3]}.${m[2]}.${m[1].slice(2)}` : ''
-}
-
 function labelHtml(d: LabelData, o: LabelOptions): string {
   // type scale follows the label height, so the small size stays legible and the big one airy
   const k = Math.max(0.68, Math.min(1.15, o.h / 22))
   const roomy = o.w >= 50
-  const notes = o.showNotes && d.notes && roomy ? `<div class="nt">${esc(d.notes)}</div>` : ''
-  const date = fmtDate(o.date)
+  const brand = d.kind === 'fragrance' ? `<span class="br house">${esc(FRAGRANCE_BRAND)}</span>` : `<span class="br">${MARK}<b>VIALINTIA</b></span>`
+  const extra = roomy && d.extra ? `<span>${esc(d.extra)}</span>` : ''
   return `<div class="lb" style="--k:${k}">
-  <div class="top"><span class="br">${MARK}<b>VIALINTIA</b></span><span>${esc(d.code)}</span></div>
-  <div class="nm">${esc(d.name)}</div>
-  ${notes}
-  <div class="bt"><span>${esc(roomy ? d.product : d.productShort)}</span>${date ? `<span>${date}</span>` : ''}<span>${esc(o.volume)}</span></div>
+  <div class="top">${brand}<span>${esc(d.code)}</span></div>
+  <div class="nm${d.kind === 'material' ? ' mat' : ''}">${esc(d.name)}</div>
+  <div class="bt"><span${d.kind === 'material' ? ' class="keep"' : ''}>${esc(roomy ? d.info : d.infoShort)}</span>${extra}<span>${esc(o.volume)}</span></div>
 </div>`
 }
 
@@ -110,7 +112,9 @@ export function labelsToPdfHtml(items: LabelData[], o: LabelOptions): string {
   .br b { font-weight: 700; letter-spacing: .32em; }
   .top > span:last-child { color: #555; }
   .nm { font-size: calc(8.4pt * var(--k)); font-weight: 700; letter-spacing: .12em; text-transform: uppercase; line-height: 1.2; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; padding-top: calc(0.5mm * var(--k)); padding-bottom: calc(0.8mm * var(--k)); border-bottom: 0.2mm solid #000; }
-  .nt { font-size: calc(4.8pt * var(--k)); letter-spacing: .06em; color: #333; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: calc(-0.6mm * var(--k)); }
+  .house { font-weight: 700; letter-spacing: .38em; }
+  .nm.mat { text-transform: none; letter-spacing: .02em; }
+  .bt .keep { text-transform: none; letter-spacing: .08em; }
   .bt { font-size: calc(5pt * var(--k)); }
   .bt > span:nth-child(2):not(:last-child) { color: #555; }
 </style></head><body>${sheets.join('')}</body></html>`

@@ -210,7 +210,7 @@ function EditorFoot({
       <button className="btn" title="Print bottle labels — many per A4 sheet" onClick={() => setLabels(true)}>
         <IconFile /> Labels
       </button>
-      {labels && <LabelsDialog formulaId={formula.id} onClose={() => setLabels(false)} />}
+      {labels && <LabelsDialog id={formula.id} onClose={() => setLabels(false)} />}
       {scaling && <ScaleDialog formula={formula} calc={calc} settings={settings} update={update} onClose={() => setScaling(false)} />}
     </div>
   )

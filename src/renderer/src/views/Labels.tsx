@@ -5,40 +5,55 @@ import { toast, withProgress } from '@/store/ui'
 import { isWeb } from '@/platform'
 import { NumberInput } from '@/components/NumberInput'
 import { IconFile, IconX } from '@/components/Icons'
-import { LABEL_SIZES, SHEET_H, SHEET_W, labelData, labelsToPdfHtml, perSheet, type LabelEntry, type LabelOptions } from '@/lib/labels'
+import { LABEL_SIZES, SHEET_H, SHEET_W, labelData, labelsToPdfHtml, materialLabelData, perSheet, type LabelEntry, type LabelKind, type LabelOptions } from '@/lib/labels'
 
-const today = () => new Date().toISOString().slice(0, 10)
 const PX_PER_MM = 96 / 25.4
 const SHEET_PX_W = Math.ceil(SHEET_W * PX_PER_MM)
 const SHEET_PX_H = Math.ceil(SHEET_H * PX_PER_MM)
 
-/** Print bottle labels: one or more formulas, many copies, packed onto A4 sheets. */
-export function LabelsDialog({ formulaId, onClose }: { formulaId: string; onClose: () => void }) {
+/**
+ * Print bottle labels, packed onto A4 sheets: fragrances (formulas, house brand) or
+ * materials (lab bottles, Vialintia) — one or more of them, many copies each.
+ */
+export function LabelsDialog({ kind = 'fragrance', id, onClose }: { kind?: LabelKind; id: string; onClose: () => void }) {
   const formulas = useStore((s) => s.formulas)
-  const [entries, setEntries] = useState<LabelEntry[]>([{ formulaId, copies: 1 }])
+  const materials = useStore((s) => s.materials)
+  const isMat = kind === 'material'
+  const startEntry = (x: string): LabelEntry => {
+    const m = isMat ? materials.find((y) => y.id === x) : undefined
+    return { id: x, copies: 1, dilution: m?.defaultDilution ?? 100, solvent: m?.solvent }
+  }
+  const [entries, setEntries] = useState<LabelEntry[]>(() => [startEntry(id)])
   const [sizeId, setSizeId] = useState('front')
   const [custom, setCustom] = useState({ w: 40, h: 22 })
   const [volume, setVolume] = useState('10 ml')
-  const [withDate, setWithDate] = useState(true)
-  const [date, setDate] = useState(today())
-  const [showNotes, setShowNotes] = useState(true)
   const [skip, setSkip] = useState(0)
 
   const size = sizeId === 'custom' ? { w: custom.w, h: custom.h } : LABEL_SIZES.find((s) => s.id === sizeId)!
-  const opts: LabelOptions = { w: size.w, h: size.h, volume, date: withDate ? date : '', showNotes, skip }
+  const opts: LabelOptions = { w: size.w, h: size.h, volume, skip }
   const fit = perSheet(size.w, size.h)
   const items = useMemo(
     () =>
       entries.flatMap((e) => {
-        const f = formulas.find((x) => x.id === e.formulaId)
-        return f ? Array.from({ length: Math.max(0, e.copies) }, () => labelData(f)) : []
+        const d = isMat
+          ? (() => {
+              const m = materials.find((x) => x.id === e.id)
+              return m ? materialLabelData(m, e.dilution, e.solvent) : null
+            })()
+          : (() => {
+              const f = formulas.find((x) => x.id === e.id)
+              return f ? labelData(f) : null
+            })()
+        return d ? Array.from({ length: Math.max(0, e.copies) }, () => d) : []
       }),
-    [entries, formulas]
+    [entries, formulas, materials, isMat]
   )
   const total = items.length
   const sheets = Math.max(1, Math.ceil((Math.min(skip, fit.count - 1) + total) / fit.count))
-  const html = useMemo(() => labelsToPdfHtml(items, opts), [items, opts.w, opts.h, opts.volume, opts.date, opts.showNotes, opts.skip]) // eslint-disable-line react-hooks/exhaustive-deps
-  const free = formulas.filter((f) => !entries.some((e) => e.formulaId === f.id))
+  const html = useMemo(() => labelsToPdfHtml(items, opts), [items, opts.w, opts.h, opts.volume, opts.skip]) // eslint-disable-line react-hooks/exhaustive-deps
+  const pool: { id: string; name: string }[] = isMat ? [...materials].sort((a, b) => a.name.localeCompare(b.name)) : formulas
+  const free = pool.filter((f) => !entries.some((e) => e.id === f.id))
+  const nameOf = (x: string) => pool.find((y) => y.id === x)?.name
 
   // the preview frame is a real-size sheet (184.6 mm ≈ 698 px), scaled down to the column
   const box = useRef<HTMLDivElement>(null)
@@ -55,7 +70,7 @@ export function LabelsDialog({ formulaId, onClose }: { formulaId: string; onClos
 
   const print = async () => {
     if (!total) return toast('Nothing to print — add at least one label')
-    const name = entries.length === 1 ? `${formulas.find((f) => f.id === entries[0].formulaId)?.name ?? 'labels'} - labels.pdf` : 'labels.pdf'
+    const name = entries.length === 1 ? `${nameOf(entries[0].id) ?? 'labels'} - labels.pdf` : 'labels.pdf'
     const p = isWeb ? await window.vialintia.printPdf(html, name) : await withProgress('Exporting labels', () => window.vialintia.printPdf(html, name))
     if (p) toast('Labels saved — print at 100 % (actual size)')
   }
@@ -64,7 +79,7 @@ export function LabelsDialog({ formulaId, onClose }: { formulaId: string; onClos
     <div className="overlay" onMouseDown={onClose}>
       <div className="modal lbl-modal" onMouseDown={(e) => e.stopPropagation()}>
         <div className="row" style={{ alignItems: 'center' }}>
-          <h3 style={{ margin: 0 }}>Bottle labels</h3>
+          <h3 style={{ margin: 0 }}>{isMat ? 'Material labels' : 'Bottle labels'}</h3>
           <div className="spacer" />
           <button className="btn btn-ghost btn-icon" onClick={onClose} aria-label="Close">
             <IconX size={16} />
@@ -76,15 +91,21 @@ export function LabelsDialog({ formulaId, onClose }: { formulaId: string; onClos
             <div className="field">
               <label>Labels</label>
               {entries.map((e, i) => {
-                const f = formulas.find((x) => x.id === e.formulaId)
+                const set = (patch: Partial<LabelEntry>) => setEntries((list) => list.map((x, j) => (j === i ? { ...x, ...patch } : x)))
                 return (
-                  <div key={e.formulaId} className="lbl-entry">
-                    <span className="nm">{f?.name ?? 'Missing formula'}</span>
+                  <div key={e.id} className={`lbl-entry${isMat ? ' mat' : ''}`}>
+                    <span className="nm">{nameOf(e.id) ?? 'Missing'}</span>
+                    {isMat && (
+                      <span className="suffix lbl-dil" title="Dilution in this bottle (100 = neat)">
+                        <NumberInput className="input input-sm" value={e.dilution ?? 100} min={0.001} max={100} onCommit={(v) => set({ dilution: Math.min(100, Math.max(0.001, v ?? 100)) })} />
+                        <span>%</span>
+                      </span>
+                    )}
                     <NumberInput
                       className="input input-sm"
                       value={e.copies}
                       min={0}
-                      onCommit={(v) => setEntries((list) => list.map((x, j) => (j === i ? { ...x, copies: Math.max(0, Math.round(v ?? 0)) } : x)))}
+                      onCommit={(v) => set({ copies: Math.max(0, Math.round(v ?? 0)) })}
                     />
                     <span className="x">×</span>
                     {entries.length > 1 && (
@@ -99,9 +120,9 @@ export function LabelsDialog({ formulaId, onClose }: { formulaId: string; onClos
                 <select
                   className="select input-sm"
                   value=""
-                  onChange={(e) => e.target.value && setEntries((list) => [...list, { formulaId: e.target.value, copies: 1 }])}
+                  onChange={(e) => e.target.value && setEntries((list) => [...list, startEntry(e.target.value)])}
                 >
-                  <option value="">+ Add another formula…</option>
+                  <option value="">{isMat ? '+ Add another material…' : '+ Add another formula…'}</option>
                   {free.map((f) => (
                     <option key={f.id} value={f.id}>
                       {f.name}
@@ -146,15 +167,6 @@ export function LabelsDialog({ formulaId, onClose }: { formulaId: string; onClos
               </div>
             </div>
 
-            <div className="field">
-              <label className="row small" style={{ gap: 8, cursor: 'pointer', textTransform: 'none', letterSpacing: 0 }}>
-                <input type="checkbox" checked={withDate} onChange={(e) => setWithDate(e.target.checked)} /> Date
-                {withDate && <input type="date" className="input input-sm" style={{ width: 150 }} value={date} onChange={(e) => setDate(e.target.value)} />}
-              </label>
-              <label className="row small" style={{ gap: 8, cursor: 'pointer', textTransform: 'none', letterSpacing: 0, marginTop: 6 }}>
-                <input type="checkbox" checked={showNotes} onChange={(e) => setShowNotes(e.target.checked)} /> Notes from the pyramid (wide labels)
-              </label>
-            </div>
 
             <p className="faint small" style={{ margin: 0 }}>
               {fit.count} per A4 sheet ({fit.cols} × {fit.rows}) · {total} label{total === 1 ? '' : 's'} → {sheets} sheet{sheets === 1 ? '' : 's'}

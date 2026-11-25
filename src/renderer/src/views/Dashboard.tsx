@@ -415,7 +415,7 @@ export function Dashboard() {
           )}
         </>
       )}
-      {labelsFor && <LabelsDialog formulaId={labelsFor} onClose={() => setLabelsFor(null)} />}
+      {labelsFor && <LabelsDialog id={labelsFor} onClose={() => setLabelsFor(null)} />}
     </div>
   )
 }
