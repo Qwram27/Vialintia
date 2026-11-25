@@ -952,7 +952,7 @@ function MobileComposition({
         </button>
       </div>
 
-      <div className="m-rows">
+      <div className="m-rows cl">
         {calc.rows.map((r, idx) => {
           const m = r.material
           const entry = rowIfraEntry(calc.ifra, m, accords)
@@ -968,10 +968,10 @@ function MobileComposition({
                 />
               </div>
             )}
-            <button className={`m-row${entry?.status === 'over' ? ' over' : ''}`} onClick={() => setEditId(r.row.id)}>
-              <span className="m-row-no">{String(idx + 1).padStart(2, '0')}</span>
-              <span className="m-row-top">
-                <span className="m-row-name">
+            <button className={`cl-row${entry?.status === 'over' ? ' over' : ''}`} onClick={() => setEditId(r.row.id)}>
+              <span className="cl-bar" style={{ background: m ? settings.noteColors[m.note] : 'var(--faint)' }} />
+              <span className="cl-main">
+                <span className="cl-name">
                   {m ? (
                     <>
                       <span className="dot" style={{ background: familyById(settings, m.family).color }} />
@@ -981,42 +981,16 @@ function MobileComposition({
                     <span className="missing">Missing material</span>
                   )}
                 </span>
-                <span className="m-row-amt">{fmt(r.row.amount, amtDec)}</span>
+                <span className="cl-sub">
+                  {m ? NOTE_LABELS[m.note] : '—'}
+                  {r.row.dilution < 100 && <span className="keep"> · {Number(r.row.dilution.toFixed(2))}% {r.row.solvent ?? ''}</span>}
+                  {entry && (entry.status === 'over' || entry.status === 'near') && <span className="cl-flag"> · {entry.status === 'over' ? '! IFRA' : '◐ IFRA'}</span>}
+                </span>
               </span>
-              <span className="m-row-stats">
-                <span className="st">
-                  <span className="k">Note</span>
-                  {m ? (
-                    <span className="v note-v">
-                      <i style={{ background: settings.noteColors[m.note] }} />
-                      {NOTE_LABELS[m.note]}
-                    </span>
-                  ) : (
-                    <span className="v">—</span>
-                  )}
-                </span>
-                <span className="st">
-                  <span className="k">Dilution</span>
-                  <span className="v">{r.row.dilution < 100 ? `${Number(r.row.dilution.toFixed(2))}%${r.row.solvent ? ` ${r.row.solvent}` : ''}` : 'Neat'}</span>
-                </span>
-                <span className="st">
-                  <span className="k">Active</span>
-                  <span className="v">{fmtPct(r.neatPct)}</span>
-                </span>
-                {showBatch ? (
-                  <span className="st">
-                    <span className="k">Batch</span>
-                    <span className="v">{fmtSmart(r.batchGrams)} g</span>
-                  </span>
-                ) : (
-                  <span className="st" />
-                )}
+              <span className="cl-side">
+                <span className="cl-v">{fmt(r.row.amount, amtDec)}</span>
+                <span className="cl-s">{fmtPct(r.neatPct)}</span>
               </span>
-              {entry && entry.status !== 'ok' && (
-                <span className="m-row-ifra">
-                  <IfraBadge entry={entry} />
-                </span>
-              )}
             </button>
             </Fragment>
           )

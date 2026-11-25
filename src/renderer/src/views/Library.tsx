@@ -11,6 +11,7 @@ import { useIsMobile } from '@/lib/useMobile'
 import { Sheet } from '@/components/Sheet'
 import { IconDownload, IconFile, IconPlus, IconSearch, IconTrash, IconUpload, IconX } from '@/components/Icons'
 import { LabelsDialog } from '@/views/Labels'
+import { useLongPress } from '@/lib/useLongPress'
 
 const TYPES: Record<MaterialType, string> = { natural: 'Natural', synthetic: 'Synthetic', base: 'Base / accord', other: 'Other' }
 type SortKey = 'name' | 'family' | 'note' | 'ifra' | 'price'
@@ -31,6 +32,7 @@ export function Library() {
   const deleteMaterial = useStore((s) => s.deleteMaterial)
 
   const [labelsFor, setLabelsFor] = useState<string | null>(null)
+  const press = useLongPress()
   const usage = useMemo(() => {
     const m = new Map<string, number>()
     for (const f of formulas) {
@@ -40,7 +42,7 @@ export function Library() {
     return m
   }, [formulas])
 
-  const rowMenu = (e: React.MouseEvent, m: Material) =>
+  const rowMenu = (e: { clientX: number; clientY: number; preventDefault(): void; stopPropagation(): void }, m: Material) =>
     openContextMenu(e, [
       { label: 'Edit', onSelect: () => setSelected(m.id) },
       { label: 'Print labels…', onSelect: () => setLabelsFor(m.id) },
@@ -111,13 +113,15 @@ export function Library() {
   )
 
   return (
-    <div className="page page-wide" style={{ maxWidth: 1700 }}>
+    <div className="page page-wide lib-page" style={{ maxWidth: 1700 }}>
       {labelsFor && <LabelsDialog kind="material" id={labelsFor} onClose={() => setLabelsFor(null)} />}
       <div className="page-head">
         <div>
           <div className="page-kicker">Index · Raw materials</div>
           <h1 className="page-title">Materials</h1>
-          <div className="page-sub">{String(materials.length).padStart(3, '0')} entries · IFRA from the IFRA Standards · tenacity from TGSC · prices are yours</div>
+          <div className="page-sub">
+            {String(materials.length).padStart(3, '0')} entries{mobile ? '' : ' · IFRA from the IFRA Standards · tenacity from TGSC · prices are yours'}
+          </div>
         </div>
         <div className="btn-group">
           <button
@@ -137,6 +141,18 @@ export function Library() {
           <IconSearch />
           <input className="input" placeholder="Search name, CAS, odour, supplier…" value={q} onChange={(e) => setQ(e.target.value)} />
         </div>
+        {mobile && (
+          <button
+            className="btn btn-primary btn-icon lib-add"
+            title="New material"
+            onClick={() => {
+              const m = addMaterial({ family: family !== 'all' ? family : 'other', note: note !== 'all' ? note : 'heart' })
+              setSelected(m.id)
+            }}
+          >
+            <IconPlus />
+          </button>
+        )}
         {/* filters only once a search has started (or a filter is set) — keeps the page calm */}
         {showFilters && (
           <>
@@ -168,38 +184,27 @@ export function Library() {
 
       <div className={`lib${sel && !mobile ? ' with-drawer' : ''}`}>
         {mobile ? (
-          <div className="m-list">
+          <div className="m-list cl">
             {list.map((m) => {
               const f = familyById(settings, m.family)
+              const used = usage.get(m.id)
               return (
-                <button key={m.id} className={`m-row${m.id === selected ? ' sel' : ''}`} onClick={() => setSelected(m.id)}>
-                  <span className="m-row-main">
-                    <span className="m-row-name">
+                <button key={m.id} className={`cl-row${m.id === selected ? ' sel' : ''}`} onClick={() => setSelected(m.id)} {...press((pt) => rowMenu(pt, m))}>
+                  <span className="cl-bar" style={{ background: settings.noteColors[m.note] }} />
+                  <span className="cl-main">
+                    <span className="cl-name">
                       <span className="dot" style={{ background: f.color }} />
                       <span className="nm">{m.name}</span>
                     </span>
-                    <span className="m-row-meta">
-                      <span className="note-pill" style={{ background: settings.noteColors[m.note], color: inkOn(settings.noteColors[m.note]) }}>
-                        {NOTE_LABELS[m.note].slice(0, 1)}
-                      </span>
-                      <span>{f.name}</span>
-                      {m.cas && (
-                        <>
-                          <span>·</span>
-                          <span>{m.cas}</span>
-                        </>
-                      )}
-                      {usage.get(m.id) ? (
-                        <>
-                          <span>·</span>
-                          <span>{usage.get(m.id)}×</span>
-                        </>
-                      ) : null}
+                    <span className="cl-sub">
+                      {f.name} · {NOTE_LABELS[m.note]}
+                      {m.defaultDilution < 100 && <span className="keep"> · {fmtTrim(m.defaultDilution)}% {m.solvent ?? ''}</span>}
+                      {used ? <> · {used}×</> : null}
                     </span>
                   </span>
-                  <span className="m-row-amt">
-                    <span className="v small">{m.ifraLimit != null ? `${fmtTrim(m.ifraLimit)}%` : '—'}</span>
-                    <span className="u">{m.pricePerKg ? `${settings.currency}${fmt(m.pricePerKg, 0)}/kg` : 'IFRA'}</span>
+                  <span className="cl-side">
+                    <span className="cl-s cas">{m.cas || '—'}</span>
+                    <span className="cl-s">{m.ifraLimit != null ? `IFRA ${fmtTrim(m.ifraLimit)}%` : ''}</span>
                   </span>
                 </button>
               )
@@ -432,18 +437,20 @@ function MaterialDrawer({ material, usage, onClose }: { material: Material; usag
             </select>
           </div>
         </div>
-        <div className="field">
-          <label>IFRA limit · Cat. 4 (fine fragrance)</label>
-          <div className="suffix">
-            <NumberInput value={material.ifraLimit} min={0} allowEmpty onCommit={(v) => set({ ifraLimit: v })} placeholder="No own IFRA Standard" />
-            <span>%</span>
+        <div className="grid-2">
+          <div className="field">
+            <label title="IFRA Category 4 (fine fragrance): max % in the finished product. Check your supplier’s IFRA certificate / the current IFRA Amendment.">IFRA limit · Cat. 4</label>
+            <div className="suffix">
+              <NumberInput value={material.ifraLimit} min={0} allowEmpty onCommit={(v) => set({ ifraLimit: v })} placeholder="none" />
+              <span>%</span>
+            </div>
           </div>
-          <span className="hint">Max % in the finished product. Check your supplier’s IFRA certificate / the current IFRA Amendment.</span>
+          <div className="field">
+            <label>Supplier</label>
+            {text('supplier')}
+          </div>
         </div>
-        <div className="field">
-          <label>Supplier</label>
-          {text('supplier')}
-        </div>
+        <span className="hint" style={{ marginTop: -6 }}>IFRA = max % in the finished product — check your supplier’s certificate.</span>
         <div className="field">
           <label>Odour description</label>
           {text('description', true)}

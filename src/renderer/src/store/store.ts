@@ -100,7 +100,7 @@ function normalizeFormula(f: Formula): Formula {
       base: Array.isArray(f.pyramid?.base) ? f.pyramid.base : []
     },
     description: f.description ?? '',
-    batch: { ...{ mode: 'bottles' as const, bottles: 1, bottleMl: 50, massG: 10 }, ...(f.batch ?? {}) },
+    batch: { ...{ mode: 'bottles' as const, bottles: 1, bottleMl: 5, massG: 5 }, ...(f.batch ?? {}) },
     currentVersionId: versions.some((v) => v.id === f.currentVersionId) ? f.currentVersionId : versions[versions.length - 1].id
   }
 }
@@ -127,7 +127,7 @@ export function newFormula(name = 'Untitled formula'): Formula {
     unit: 'g',
     productType: 'edp',
     concentration: PRODUCT_PRESETS.edp.concentration,
-    batch: { mode: 'bottles', bottles: 1, bottleMl: 50, massG: 10 },
+    batch: { mode: 'bottles', bottles: 1, bottleMl: 5, massG: 5 },
     versions: [v],
     currentVersionId: v.id,
     notes: [],
