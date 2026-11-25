@@ -5,7 +5,7 @@ import { toast, withProgress } from '@/store/ui'
 import { isWeb } from '@/platform'
 import { NumberInput } from '@/components/NumberInput'
 import { IconFile, IconX } from '@/components/Icons'
-import { LABEL_SIZES, SHEET_H, SHEET_W, labelData, labelsToPdfHtml, materialLabelData, perSheet, type LabelEntry, type LabelKind, type LabelOptions } from '@/lib/labels'
+import { DEFAULT_AUTHOR, LABEL_SIZES, SHEET_H, SHEET_W, labelData, labelsToPdfHtml, materialLabelData, perSheet, type LabelEntry, type LabelKind, type LabelOptions } from '@/lib/labels'
 
 const PX_PER_MM = 96 / 25.4
 const SHEET_PX_W = Math.ceil(SHEET_W * PX_PER_MM)
@@ -24,13 +24,16 @@ export function LabelsDialog({ kind = 'fragrance', id, onClose }: { kind?: Label
     return { id: x, copies: 1, dilution: m?.defaultDilution ?? 100, solvent: m?.solvent }
   }
   const [entries, setEntries] = useState<LabelEntry[]>(() => [startEntry(id)])
+  const settings = useStore((s) => s.settings)
+  const updateSettings = useStore((s) => s.updateSettings)
+  const [author, setAuthor] = useState(settings.labelAuthor ?? DEFAULT_AUTHOR)
   const [sizeId, setSizeId] = useState('front')
   const [custom, setCustom] = useState({ w: 40, h: 22 })
   const [volume, setVolume] = useState('10 ml')
   const [skip, setSkip] = useState(0)
 
   const size = sizeId === 'custom' ? { w: custom.w, h: custom.h } : LABEL_SIZES.find((s) => s.id === sizeId)!
-  const opts: LabelOptions = { w: size.w, h: size.h, volume, skip }
+  const opts: LabelOptions = { w: size.w, h: size.h, volume, author: author.trim(), skip }
   const fit = perSheet(size.w, size.h)
   const items = useMemo(
     () =>
@@ -50,7 +53,7 @@ export function LabelsDialog({ kind = 'fragrance', id, onClose }: { kind?: Label
   )
   const total = items.length
   const sheets = Math.max(1, Math.ceil((Math.min(skip, fit.count - 1) + total) / fit.count))
-  const html = useMemo(() => labelsToPdfHtml(items, opts), [items, opts.w, opts.h, opts.volume, opts.skip]) // eslint-disable-line react-hooks/exhaustive-deps
+  const html = useMemo(() => labelsToPdfHtml(items, opts), [items, opts.w, opts.h, opts.volume, opts.author, opts.skip]) // eslint-disable-line react-hooks/exhaustive-deps
   const pool: { id: string; name: string }[] = isMat ? [...materials].sort((a, b) => a.name.localeCompare(b.name)) : formulas
   const free = pool.filter((f) => !entries.some((e) => e.id === f.id))
   const nameOf = (x: string) => pool.find((y) => y.id === x)?.name
@@ -155,6 +158,19 @@ export function LabelsDialog({ kind = 'fragrance', id, onClose }: { kind?: Label
                 </div>
               )}
             </div>
+
+            {!isMat && (
+              <div className="field">
+                <label>Author</label>
+                <input
+                  className="input"
+                  value={author}
+                  placeholder="Perfume house or your name"
+                  onChange={(e) => setAuthor(e.target.value)}
+                  onBlur={() => author.trim() !== (settings.labelAuthor ?? DEFAULT_AUTHOR) && updateSettings({ labelAuthor: author.trim() })}
+                />
+              </div>
+            )}
 
             <div className="grid-2">
               <div className="field">

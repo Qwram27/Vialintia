@@ -15,21 +15,24 @@ export interface LabelSize {
 }
 
 export const LABEL_SIZES: LabelSize[] = [
+  { id: 'large', name: 'Large 50 × 25 mm', w: 50, h: 25 },
   { id: 'front', name: 'Front 40 × 22 mm', w: 40, h: 22 },
-  { id: 'wrap', name: 'Wrap 60 × 22 mm', w: 60, h: 22 },
-  { id: 'small', name: 'Small 30 × 15 mm', w: 30, h: 15 }
+  { id: 'medium', name: 'Medium 35 × 20 mm', w: 35, h: 20 },
+  { id: 'small', name: 'Small 30 × 15 mm', w: 30, h: 15 },
+  { id: 'mini', name: 'Mini 25 × 15 mm', w: 25, h: 15 }
 ]
 
 export interface LabelOptions {
   w: number
   h: number
   volume: string // "10 ml"
+  author: string // fragrance labels: the perfume house / author shown top left ('' = none)
   skip: number // labels already used on the first sheet (start further down)
 }
 
-/** Fragrance labels carry the perfume house; material labels the lab (Vialintia). */
+/** Fragrance labels carry the author (perfume house); material labels the lab (Vialintia). */
 export type LabelKind = 'fragrance' | 'material'
-export const FRAGRANCE_BRAND = 'Aen Anvii'
+export const DEFAULT_AUTHOR = 'Aen Anvii'
 
 export interface LabelEntry {
   id: string // formula id or material id
@@ -43,9 +46,9 @@ export interface LabelData {
   kind: LabelKind
   name: string
   code: string // top right: "AV27 · V2" / "Heart"
-  info: string // bottom left: "Extrait 25%" / "10% EtOH"
+  info: string // bottom left: "Extrait 25%" / "10% EtOH" / "100%"
   infoShort: string // the same for narrow labels: "EDT 10%"
-  extra: string // bottom middle (wide labels): CAS for materials
+  sub: string // under the name's hairline: "CAS 24851-98-7" (materials)
 }
 
 export const SHEET_W = 184.6
@@ -57,12 +60,12 @@ export function labelData(f: Formula): LabelData {
   const type = f.productType === 'custom' ? '' : PRODUCT_PRESETS[f.productType]?.label ?? ''
   const conc = `${Number(f.concentration.toFixed(2))}%`
   const short = { edt: 'EDT', edp: 'EDP', edc: 'EDC', parfum: 'Extrait' }[f.productType as string] ?? ''
-  return { kind: 'fragrance', name: f.name, code: `${seasonCode(f.createdAt)} · ${v?.label ?? ''}`, info: type ? `${type} ${conc}` : conc, infoShort: short ? `${short} ${conc}` : conc, extra: '' }
+  return { kind: 'fragrance', name: f.name, code: `${seasonCode(f.createdAt)} · ${v?.label ?? ''}`, info: type ? `${type} ${conc}` : conc, infoShort: short ? `${short} ${conc}` : conc, sub: '' }
 }
 
 export function materialLabelData(m: Material, dilution = m.defaultDilution ?? 100, solvent = m.solvent): LabelData {
-  const dil = dilution < 100 ? `${Number(dilution.toFixed(2))}% ${solvent || 'EtOH'}` : 'Neat'
-  return { kind: 'material', name: m.name, code: NOTE_LABELS[m.note] ?? '', info: dil, infoShort: dil, extra: m.cas ? `CAS ${m.cas}` : '' }
+  const dil = dilution < 100 ? `${Number(dilution.toFixed(2))}% ${solvent || 'EtOH'}` : '100%'
+  return { kind: 'material', name: m.name, code: NOTE_LABELS[m.note] ?? '', info: dil, infoShort: dil, sub: `CAS ${m.cas?.trim() || '—'}` }
 }
 
 export function perSheet(w: number, h: number): { cols: number; rows: number; count: number } {
@@ -76,15 +79,20 @@ const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&l
 const MARK = `<svg viewBox="132 76 256 360" xmlns="http://www.w3.org/2000/svg" fill="none" stroke-linecap="square" stroke-linejoin="miter"><path d="M138 88 H310 L374 152 V424 H138 Z" stroke="#000" stroke-width="22"/><path d="M310 88 V152 H374" stroke="#000" stroke-width="22"/><path d="M184 180 L230 300 L276 180" stroke="#000" stroke-width="32"/><path d="M184 352 H328 M184 386 H294" stroke="#777" stroke-width="22"/></svg>`
 
 function labelHtml(d: LabelData, o: LabelOptions): string {
-  // type scale follows the label height, so the small size stays legible and the big one airy
-  const k = Math.max(0.68, Math.min(1.15, o.h / 22))
-  const roomy = o.w >= 50
-  const brand = d.kind === 'fragrance' ? `<span class="br house">${esc(FRAGRANCE_BRAND)}</span>` : `<span class="br">${MARK}<b>VIALINTIA</b></span>`
-  const extra = roomy && d.extra ? `<span>${esc(d.extra)}</span>` : ''
+  // type scale follows the label: height for the air, width so narrow labels still fit their lines
+  const k = Math.max(0.6, Math.min(1.2, Math.min(o.h / 22, o.w / 42)))
+  const roomy = o.w >= 45
+  const brand =
+    d.kind === 'fragrance'
+      ? `<span class="br house">${esc(o.author)}</span>`
+      : `<span class="br">${o.w >= 30 ? MARK : ''}<b>VIALINTIA</b></span>`
   return `<div class="lb" style="--k:${k}">
-  <div class="top">${brand}<span>${esc(d.code)}</span></div>
-  <div class="nm${d.kind === 'material' ? ' mat' : ''}">${esc(d.name)}</div>
-  <div class="bt"><span${d.kind === 'material' ? ' class="keep"' : ''}>${esc(roomy ? d.info : d.infoShort)}</span>${extra}<span>${esc(o.volume)}</span></div>
+  <div class="top">${brand}<span class="cd">${esc(d.code)}</span></div>
+  <div class="mid">
+    <div class="nm${d.kind === 'material' ? ' mat' : ''}">${esc(d.name)}</div>
+    ${d.sub ? `<div class="sub">${esc(d.sub)}</div>` : ''}
+  </div>
+  <div class="bt"><span${d.kind === 'material' ? ' class="keep"' : ''}>${esc(roomy ? d.info : d.infoShort)}</span><span>${esc(o.volume)}</span></div>
 </div>`
 }
 
@@ -104,18 +112,19 @@ export function labelsToPdfHtml(items: LabelData[], o: LabelOptions): string {
   .sheet { width: ${SHEET_W}mm; height: ${SHEET_H}mm; margin-bottom: ${297 - SHEET_H}mm; display: grid; grid-template-columns: repeat(${cols}, ${o.w}mm); grid-auto-rows: ${o.h}mm; gap: ${GAP}mm; align-content: start; }
   .sheet:last-child { margin-bottom: 0; }
   @media print { .sheet { margin-bottom: 0; break-after: page; } .sheet:last-child { break-after: auto; } }
-  .lb { position: relative; width: ${o.w}mm; height: ${o.h}mm; padding: calc(1.6mm * var(--k)) calc(2.2mm * var(--k)); display: flex; flex-direction: column; justify-content: space-between; overflow: hidden; border: 0.15mm solid #c8c8c8; }
+  .lb { position: relative; width: ${o.w}mm; height: ${o.h}mm; padding: calc(1.7mm * var(--k)) calc(2.3mm * var(--k)); display: flex; flex-direction: column; justify-content: space-between; overflow: hidden; border: 0.15mm solid #c8c8c8; }
   .lb.blank { border: 0.15mm dashed #e4e4e4; }
-  .top, .bt { display: flex; justify-content: space-between; align-items: center; gap: 1.5mm; font-size: calc(4.6pt * var(--k)); letter-spacing: .14em; text-transform: uppercase; white-space: nowrap; }
-  .br { display: inline-flex; align-items: center; gap: calc(1mm * var(--k)); }
-  .br svg { width: calc(1.9mm * var(--k)); height: calc(2.7mm * var(--k)); }
-  .br b { font-weight: 700; letter-spacing: .32em; }
-  .top > span:last-child { color: #555; }
-  .nm { font-size: calc(8.4pt * var(--k)); font-weight: 700; letter-spacing: .12em; text-transform: uppercase; line-height: 1.2; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; padding-top: calc(0.5mm * var(--k)); padding-bottom: calc(0.8mm * var(--k)); border-bottom: 0.2mm solid #000; }
-  .house { font-weight: 700; letter-spacing: .38em; }
+  .top, .bt { display: flex; justify-content: space-between; align-items: baseline; gap: 1.2mm; text-transform: uppercase; white-space: nowrap; }
+  .top { font-size: calc(4.5pt * var(--k)); letter-spacing: .14em; align-items: center; line-height: 1; }
+  .bt { font-size: calc(5.2pt * var(--k)); letter-spacing: .12em; }
+  .br { display: inline-flex; align-items: center; gap: calc(0.9mm * var(--k)); min-width: 0; overflow: hidden; }
+  .br svg { width: calc(1.8mm * var(--k)); height: calc(2.6mm * var(--k)); flex: none; }
+  .br b, .house { font-weight: 700; letter-spacing: .3em; }
+  .cd { color: #555; flex: none; }
+  .mid { display: flex; flex-direction: column; gap: calc(0.7mm * var(--k)); min-width: 0; }
+  .nm { font-size: calc(8.6pt * var(--k)); font-weight: 700; letter-spacing: .1em; text-transform: uppercase; line-height: 1.18; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; padding-top: calc(0.4mm * var(--k)); padding-bottom: calc(0.9mm * var(--k)); border-bottom: 0.2mm solid #000; }
   .nm.mat { text-transform: none; letter-spacing: .02em; }
-  .bt .keep { text-transform: none; letter-spacing: .08em; }
-  .bt { font-size: calc(5pt * var(--k)); }
-  .bt > span:nth-child(2):not(:last-child) { color: #555; }
+  .sub { font-size: calc(4.8pt * var(--k)); letter-spacing: .12em; color: #333; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bt .keep { text-transform: none; letter-spacing: .06em; }
 </style></head><body>${sheets.join('')}</body></html>`
 }
